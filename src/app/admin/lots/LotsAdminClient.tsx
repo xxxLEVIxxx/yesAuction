@@ -3,7 +3,11 @@
 import { FormEvent, useCallback, useEffect, useRef, useState } from "react";
 import { get, push, ref, remove, set, update } from "firebase/database";
 import { db } from "@/lib/firebase";
-import { parseLotImportFile, type ParsedLotRow } from "@/lib/importLotsFromSpreadsheet";
+import {
+  buildEstimate,
+  parseLotImportFile,
+  type ParsedLotRow,
+} from "@/lib/importLotsFromSpreadsheet";
 import {
   formatAuctionDate,
   parseCatalogRows,
@@ -19,6 +23,10 @@ type LotRow = {
   number?: string;
   title?: string;
   estimate?: string;
+  website?: string;
+  lowEst?: string;
+  highEst?: string;
+  startPrice?: string;
 };
 
 export function LotsAdminClient() {
@@ -34,6 +42,10 @@ export function LotsAdminClient() {
   const [number, setNumber] = useState("");
   const [title, setTitle] = useState("");
   const [estimate, setEstimate] = useState("");
+  const [website, setWebsite] = useState("");
+  const [lowEst, setLowEst] = useState("");
+  const [highEst, setHighEst] = useState("");
+  const [startPrice, setStartPrice] = useState("");
   const [importPreview, setImportPreview] = useState<{
     rows: ParsedLotRow[];
     errors: string[];
@@ -41,6 +53,7 @@ export function LotsAdminClient() {
     fileLabel: string;
   } | null>(null);
   const [importing, setImporting] = useState(false);
+  const [removingAll, setRemovingAll] = useState(false);
   const importFileRef = useRef<HTMLInputElement>(null);
 
   const load = useCallback(async () => {
@@ -65,6 +78,10 @@ export function LotsAdminClient() {
           number: v.number != null ? String(v.number) : undefined,
           title: v.title != null ? String(v.title) : undefined,
           estimate: v.estimate != null ? String(v.estimate) : undefined,
+          website: v.website != null ? String(v.website) : undefined,
+          lowEst: v.lowEst != null ? String(v.lowEst) : undefined,
+          highEst: v.highEst != null ? String(v.highEst) : undefined,
+          startPrice: v.startPrice != null ? String(v.startPrice) : undefined,
         });
       }
     }
@@ -126,18 +143,30 @@ export function LotsAdminClient() {
     setSaving(true);
     setErr("");
     try {
+      const low = lowEst.trim();
+      const high = highEst.trim();
+      const single = estimate.trim();
+      const estCombined = single || buildEstimate(low, high, "");
       const newRef = push(ref(db, "auctions/lots"));
       await set(newRef, {
         auctionId,
         ...(roundId ? { roundId } : {}),
         number: number.trim() || "—",
         title: title.trim(),
-        estimate: estimate.trim() || "",
+        estimate: estCombined,
+        website: website.trim() || "",
+        lowEst: low,
+        highEst: high,
+        startPrice: startPrice.trim() || "",
         createdAt: Date.now(),
       });
       setNumber("");
       setTitle("");
       setEstimate("");
+      setWebsite("");
+      setLowEst("");
+      setHighEst("");
+      setStartPrice("");
       await load();
     } catch (e) {
       setErr(e instanceof Error ? e.message : "保存失败");
@@ -193,6 +222,10 @@ export function LotsAdminClient() {
           number: row.number || "—",
           title: row.title,
           estimate: row.estimate || "",
+          website: row.website || "",
+          lowEst: row.lowEst || "",
+          highEst: row.highEst || "",
+          startPrice: row.startPrice || "",
           createdAt: now,
           source: "import",
         };
@@ -209,9 +242,9 @@ export function LotsAdminClient() {
 
   function downloadCsvTemplate() {
     const csv =
-      "LOT,Title,Estimate\n" +
-      "001,示例拍品 清 青花盘,$1,000 - 2,000\n" +
-      "002,示例拍品 民国 粉彩瓶,$500 - 800\n";
+      "LOT,Title,website,LowEst,HighEst,StartPrice\n" +
+      '001,"清 青花盘示例",https://theyesauction.com/products/example,1000,2000,500\n' +
+      '002,"民国 粉彩瓶示例",,800,1200,400\n';
     const blob = new Blob(["\uFEFF" + csv], { type: "text/csv;charset=utf-8" });
     const a = document.createElement("a");
     a.href = URL.createObjectURL(blob);
@@ -231,6 +264,27 @@ export function LotsAdminClient() {
     }
   }
 
+  async function onRemoveAllLots() {
+    if (lots.length === 0) return;
+    if (
+      !confirm(
+        `确定删除全部 ${lots.length} 条拍品？\n将清空数据库中的 auctions/lots，此操作不可恢复。`,
+      )
+    ) {
+      return;
+    }
+    setErr("");
+    setRemovingAll(true);
+    try {
+      await remove(ref(db, "auctions/lots"));
+      await load();
+    } catch (e) {
+      setErr(e instanceof Error ? e.message : "清空失败");
+    } finally {
+      setRemovingAll(false);
+    }
+  }
+
   function auctionTitle(aid: string | undefined) {
     if (!aid) return "—";
     const a = auctions.find((x) => x.id === aid);
@@ -242,6 +296,13 @@ export function LotsAdminClient() {
     const list = roundsByAuction[aid] || [];
     const r = list.find((x) => x.id === rid);
     return r?.label || rid.slice(0, 8);
+  }
+
+  /** 估价：优先用已保存的 estimate，否则用 LowEst–HighEst 组合 */
+  function displayEstimate(l: LotRow): string {
+    const e = l.estimate?.trim();
+    if (e) return e;
+    return buildEstimate(l.lowEst?.trim() || "", l.highEst?.trim() || "", "");
   }
 
   if (loading) {
@@ -307,12 +368,13 @@ export function LotsAdminClient() {
                 />
               </label>
               <label className="admin-auction-label">
-                估价（可选）
+                官网链接 website（可选）
                 <input
                   className="admin-auction-input"
-                  value={estimate}
-                  onChange={(e) => setEstimate(e.target.value)}
-                  placeholder="例如：$5,000–8,000"
+                  type="url"
+                  value={website}
+                  onChange={(e) => setWebsite(e.target.value)}
+                  placeholder="https://…"
                 />
               </label>
             </div>
@@ -326,6 +388,46 @@ export function LotsAdminClient() {
                 required
               />
             </label>
+            <div className="admin-auction-row2">
+              <label className="admin-auction-label">
+                LowEst（可选）
+                <input
+                  className="admin-auction-input"
+                  value={lowEst}
+                  onChange={(e) => setLowEst(e.target.value)}
+                  placeholder="低估价"
+                />
+              </label>
+              <label className="admin-auction-label">
+                HighEst（可选）
+                <input
+                  className="admin-auction-input"
+                  value={highEst}
+                  onChange={(e) => setHighEst(e.target.value)}
+                  placeholder="高估价"
+                />
+              </label>
+            </div>
+            <div className="admin-auction-row2">
+              <label className="admin-auction-label">
+                StartPrice 起拍价（可选）
+                <input
+                  className="admin-auction-input"
+                  value={startPrice}
+                  onChange={(e) => setStartPrice(e.target.value)}
+                  placeholder="例如：500"
+                />
+              </label>
+              <label className="admin-auction-label">
+                估价 Estimate（可选，可填整段；不填则用 LowEst–HighEst）
+                <input
+                  className="admin-auction-input"
+                  value={estimate}
+                  onChange={(e) => setEstimate(e.target.value)}
+                  placeholder="例如：$5,000 – 8,000"
+                />
+              </label>
+            </div>
             <div className="admin-auction-actions">
               <button type="submit" className="admin-auction-btn primary" disabled={saving}>
                 {saving ? "保存中…" : "添加拍品"}
@@ -339,8 +441,9 @@ export function LotsAdminClient() {
         <section className="admin-card-block admin-auction-form-card" style={{ marginTop: 24 }}>
           <h2 className="admin-card-block-title">批量导入（CSV / Excel）</h2>
           <p className="admin-page-desc" style={{ marginBottom: 12 }}>
-            第一行为表头，需包含 <strong>标题</strong> 列（Title / 标题 / 名称 / 拍品 等）。可选列：LOT / 编号、Estimate /
-            估价。导入的记录将写入当前选择的<strong>场次</strong>与<strong>轮次</strong>（请先在上方的「所属场次」「所属轮次」中选择，批量导入<strong>必须指定轮次</strong>）。
+            第一行为表头，需包含 <strong>Title</strong>（标题）列。推荐列名：<strong>LOT</strong>、<strong>Title</strong>、
+            <strong>website</strong>、<strong>LowEst</strong>、<strong>HighEst</strong>、<strong>StartPrice</strong>
+            （不区分大小写，亦支持英文变体如 Low Est、Start Price）。也可用单列 <strong>Estimate</strong> 作估价。导入将写入当前选择的<strong>场次</strong>与<strong>轮次</strong>（须先在上方的「所属场次」「所属轮次」中选择；<strong>必须指定轮次</strong>）。
           </p>
           <div className="admin-auction-actions" style={{ marginBottom: 12 }}>
             <button type="button" className="admin-auction-btn secondary" onClick={downloadCsvTemplate}>
@@ -379,6 +482,10 @@ export function LotsAdminClient() {
                       <tr>
                         <th>LOT</th>
                         <th>标题</th>
+                        <th>website</th>
+                        <th>LowEst</th>
+                        <th>HighEst</th>
+                        <th>StartPrice</th>
                         <th>估价</th>
                       </tr>
                     </thead>
@@ -387,7 +494,11 @@ export function LotsAdminClient() {
                         <tr key={i}>
                           <td>{r.number}</td>
                           <td>{r.title}</td>
-                          <td>{r.estimate || "—"}</td>
+                          <td className="admin-cell-mono">{r.website || "—"}</td>
+                          <td>{r.lowEst || "—"}</td>
+                          <td>{r.highEst || "—"}</td>
+                          <td>{r.startPrice || "—"}</td>
+                          <td>{r.estimate || buildEstimate(r.lowEst, r.highEst, "") || "—"}</td>
                         </tr>
                       ))}
                     </tbody>
@@ -428,7 +539,31 @@ export function LotsAdminClient() {
       ) : null}
 
       <section className="admin-card-block" style={{ marginTop: 24 }}>
-        <h2 className="admin-card-block-title">拍品目录</h2>
+        <div
+          style={{
+            display: "flex",
+            flexWrap: "wrap",
+            alignItems: "center",
+            justifyContent: "space-between",
+            gap: 12,
+            marginBottom: 8,
+          }}
+        >
+          <h2 className="admin-card-block-title" style={{ margin: 0 }}>
+            拍品目录
+          </h2>
+          {lots.length > 0 ? (
+            <button
+              type="button"
+              className="admin-auction-btn secondary"
+              style={{ color: "#b91c1c", borderColor: "#fecaca" }}
+              disabled={removingAll}
+              onClick={() => void onRemoveAllLots()}
+            >
+              {removingAll ? "清空中…" : "清空全部拍品"}
+            </button>
+          ) : null}
+        </div>
         {lots.length === 0 ? (
           <p className="admin-muted">暂无拍品。</p>
         ) : (
@@ -441,6 +576,10 @@ export function LotsAdminClient() {
                   <th>场次</th>
                   <th>轮次</th>
                   <th>估价</th>
+                  <th>LowEst</th>
+                  <th>HighEst</th>
+                  <th>StartPrice</th>
+                  <th>website</th>
                   <th />
                 </tr>
               </thead>
@@ -451,7 +590,19 @@ export function LotsAdminClient() {
                     <td>{l.title || "—"}</td>
                     <td className="admin-cell-mono">{auctionTitle(l.auctionId)}</td>
                     <td>{roundLabel(l.auctionId, l.roundId)}</td>
-                    <td>{l.estimate || "—"}</td>
+                    <td>{displayEstimate(l) || "—"}</td>
+                    <td>{l.lowEst || "—"}</td>
+                    <td>{l.highEst || "—"}</td>
+                    <td>{l.startPrice || "—"}</td>
+                    <td className="admin-cell-mono">
+                      {l.website ? (
+                        <a href={l.website} target="_blank" rel="noopener noreferrer" className="admin-erp-site-link">
+                          链接
+                        </a>
+                      ) : (
+                        "—"
+                      )}
+                    </td>
                     <td>
                       <button type="button" className="admin-auction-linkbtn danger" onClick={() => onDeleteLot(l.id)}>
                         删除

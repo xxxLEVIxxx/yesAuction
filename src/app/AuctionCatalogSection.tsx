@@ -1,6 +1,7 @@
 "use client";
 
 import type { User } from "firebase/auth";
+import Link from "next/link";
 import { useEffect, useState } from "react";
 import { get, ref } from "firebase/database";
 import { db } from "@/lib/firebase";
@@ -81,14 +82,19 @@ export function AuctionCatalogSection({ user, authLoading }: Props) {
               <li key={a.id} className="auction-catalog-item">
                 <div className="auction-catalog-item-head">
                   <span className="auction-catalog-item-title">{a.title}</span>
-                  <a
-                    href={MAIN_AUCTION_SITE}
-                    className="auction-catalog-item-link"
-                    target="_blank"
-                    rel="noopener noreferrer"
-                  >
-                    官网拍品目录
-                  </a>
+                  <span className="auction-catalog-item-actions">
+                    <Link href={`/auction/${a.id}`} className="auction-catalog-item-link auction-catalog-item-link--bid">
+                      出价目录
+                    </Link>
+                    <a
+                      href={MAIN_AUCTION_SITE}
+                      className="auction-catalog-item-link"
+                      target="_blank"
+                      rel="noopener noreferrer"
+                    >
+                      官网拍品目录
+                    </a>
+                  </span>
                   {a.status === "live" ? <span className="auction-catalog-live">LIVE</span> : null}
                 </div>
                 {a.summary ? <p className="auction-catalog-summary">{a.summary}</p> : null}
@@ -114,14 +120,19 @@ export function AuctionCatalogSection({ user, authLoading }: Props) {
               <li key={a.id} className="auction-catalog-item muted">
                 <div className="auction-catalog-item-head">
                   <span className="auction-catalog-item-title">{a.title}</span>
-                  <a
-                    href={MAIN_AUCTION_SITE}
-                    className="auction-catalog-item-link"
-                    target="_blank"
-                    rel="noopener noreferrer"
-                  >
-                    官网拍品目录
-                  </a>
+                  <span className="auction-catalog-item-actions">
+                    <Link href={`/auction/${a.id}`} className="auction-catalog-item-link auction-catalog-item-link--bid">
+                      出价目录
+                    </Link>
+                    <a
+                      href={MAIN_AUCTION_SITE}
+                      className="auction-catalog-item-link"
+                      target="_blank"
+                      rel="noopener noreferrer"
+                    >
+                      官网拍品目录
+                    </a>
+                  </span>
                 </div>
                 {a.summary ? <p className="auction-catalog-summary">{a.summary}</p> : null}
                 <AuctionRoundsBlock rounds={roundsByAuction[a.id]} />

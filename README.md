@@ -4,7 +4,7 @@ This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-
 
 - **`auctions/catalog/{auctionId}`** — Admin-created auctions (title, summary, description, `startAt`, optional `endAt`, `status`). Shown on the public homepage (except `draft`).
 - **`auctions/rounds/{auctionId}/{roundId}`** — Rounds within an auction (e.g. Day 1 / Day 2): `label`, `description`, `startAt`/`endAt`, `order`. Shown on the homepage under each auction; lots can link with `roundId`.
-- **`auctions/lots/{lotId}`** — Lots with `auctionId`, optional `roundId`, `number`, `title`, `estimate`. Admin **拍品与场次** supports CSV / Excel import (`xlsx`); imported rows include `source: "import"` and require a selected **轮次**.
+- **`auctions/lots/{lotId}`** — Lots with `auctionId`, optional `roundId`, `number`, `title`, `estimate`, plus optional `website`, `lowEst`, `highEst`, `startPrice` (from import). Admin **拍品与场次** supports CSV / Excel import (`xlsx`); recommended headers include **LOT**, **Title**, **website**, **LowEst**, **HighEst**, **StartPrice**; imported rows include `source: "import"` and require a selected **轮次**.
 - **`auctionJoinRequests/{auctionId}/{userId}`** — User “申请参拍” from the homepage; includes `depositStatus` (`pending` | `waived` | `pay_required`) and `processed` for admin review under **参拍审核**.
 - **`auctions/current`** — Current lot on the block (used by `/bid`); unchanged.
 
@@ -13,6 +13,10 @@ This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-
 **Env:** `NEXT_PUBLIC_SECURITY_DEPOSIT_URL` — optional. When a join request is approved with **需缴纳保证金**, the homepage shows a **缴纳保证金** button opening this URL (with `?auctionId=` appended). Defaults to `https://theyesauction.com` if unset.
 
 **Env:** `NEXT_PUBLIC_MAIN_SITE_URL` — optional. Homepage auction cards link **官网拍品目录** to this URL (defaults to `https://theyesauction.com`).
+
+**Public catalog:** `/auction/[auctionId]` lists rounds (tabs) and lots (LOT、标题、估价、起拍价) with search; linked from homepage **出价目录** and from approved join requests (**浏览拍品 / 出价**). Each lot links to **`/auction/[auctionId]/lot/[lotId]`** (proxy bid UI, same as `/bid` with lot context). Global proxy bidding without a lot remains at `/bid`.
+
+**Proxy / pre-bids:** written to **`itemBids/{lotId}/{userId}`**, **`absenteeBids/{lotId}/{userId}`**, and **`itemBidHistory/{lotId}/{pushId}`** (see `BidLotClient`). The bid page reads **`itemBids/.../amount`** to show “当前代理出价” and allows **修改** (increase-only).
 
 **Mobile / LAN dev:** Open the app via `http://192.168.x.x:3000` only if that host is added in **Firebase Console → Authentication → Settings → Authorized domains** (e.g. `192.168.1.112`). Otherwise Auth may not finish and the home page can stay on loading until timeouts.
 

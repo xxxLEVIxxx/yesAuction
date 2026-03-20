@@ -1,8 +1,14 @@
 import * as XLSX from "xlsx";
 
+/** Parsed row from CSV/XLSX (headers matched flexibly). */
 export type ParsedLotRow = {
   number: string;
   title: string;
+  website: string;
+  lowEst: string;
+  highEst: string;
+  startPrice: string;
+  /** Combined display / legacy single “Estimate” column */
   estimate: string;
 };
 
@@ -13,7 +19,11 @@ function normCell(v: unknown): string {
 }
 
 function normalizeHeader(h: string): string {
-  return h.trim().toLowerCase().replace(/\s+/g, " ");
+  return h
+    .replace(/^\uFEFF/, "")
+    .trim()
+    .toLowerCase()
+    .replace(/\s+/g, " ");
 }
 
 /** Match column header text (Chinese / English). */
@@ -26,12 +36,32 @@ function colIndex(headers: string[], regexes: RegExp[]): number {
   return -1;
 }
 
-const RE_LOT = /^(lot|lot\s+no|lotno|lot\s*#|no\.?|number|#|编号|lot号|拍品号)$/i;
+const RE_LOT =
+  /^(lot|lot\s+no|lotno|lot\s+number|lot\s*#|no\.?|number|#|编号|lot号|拍品号)$/i;
 const RE_TITLE = /^(title|名称|标题|拍品名称|拍品|description|name|品名)$/i;
-const RE_EST = /^(estimate|估价|价格|price|低估价|高估价)$/i;
+const RE_WEB = /^(website|url|链接|link|网址|网站|网页)$/i;
+/** LowEst, Low Est, Low Estimate, lowest, 低估价 … */
+const RE_LOW =
+  /^(lowest|low\s*est|low_est|low estimate|low\s+estimate|低估|低估价)$/i;
+/** HighEst, High Est, High Estimate, highest, 高估价 … */
+const RE_HIGH =
+  /^(highest|high\s*est|high_est|high estimate|high\s+estimate|高估|高估价)$/i;
+const RE_START = /^(startprice|start\s*price|起拍|起拍价|起标价)$/i;
+/** Single combined estimate column (optional if Low/High present) */
+const RE_EST_SINGLE = /^(estimate|估价|价格|price)$/i;
+
+/** Exported for admin UI: show 估价 when only low/high are stored */
+export function buildEstimate(low: string, high: string, single: string): string {
+  if (single) return single;
+  if (low && high) return `${low} – ${high}`;
+  if (low) return low;
+  if (high) return high;
+  return "";
+}
 
 /**
- * First row = headers. Required: title column. LOT / 估价 optional.
+ * First row = headers. Required: Title. LOT optional.
+ * Prefers: website, LowEst, HighEst, StartPrice; fallback single Estimate.
  */
 export function parseRowsFromMatrix(rows: unknown[][]): { ok: ParsedLotRow[]; errors: string[] } {
   const errors: string[] = [];
@@ -43,10 +73,14 @@ export function parseRowsFromMatrix(rows: unknown[][]): { ok: ParsedLotRow[]; er
   const headerRow = (rows[0] || []).map((c) => normCell(c));
   const iLot = colIndex(headerRow, [RE_LOT]);
   const iTitle = colIndex(headerRow, [RE_TITLE]);
-  const iEst = colIndex(headerRow, [RE_EST]);
+  const iWeb = colIndex(headerRow, [RE_WEB]);
+  const iLow = colIndex(headerRow, [RE_LOW]);
+  const iHigh = colIndex(headerRow, [RE_HIGH]);
+  const iStart = colIndex(headerRow, [RE_START]);
+  const iEst = colIndex(headerRow, [RE_EST_SINGLE]);
 
   if (iTitle < 0) {
-    errors.push("未找到「标题」列：请使用表头 Title / 标题 / 名称 / 拍品 等。");
+    errors.push("未找到「标题」列：请使用 Title / 标题 / 名称 / 拍品 等。");
     return { ok: [], errors };
   }
 
@@ -61,13 +95,21 @@ export function parseRowsFromMatrix(rows: unknown[][]): { ok: ParsedLotRow[]; er
       continue;
     }
 
-    const number =
-      iLot >= 0 ? normCell(line[iLot]) : String(r);
-    const estimate = iEst >= 0 ? normCell(line[iEst]) : "";
+    const number = iLot >= 0 ? normCell(line[iLot]) : String(r);
+    const website = iWeb >= 0 ? normCell(line[iWeb]) : "";
+    const lowEst = iLow >= 0 ? normCell(line[iLow]) : "";
+    const highEst = iHigh >= 0 ? normCell(line[iHigh]) : "";
+    const startPrice = iStart >= 0 ? normCell(line[iStart]) : "";
+    const singleEst = iEst >= 0 ? normCell(line[iEst]) : "";
+    const estimate = buildEstimate(lowEst, highEst, singleEst);
 
     ok.push({
       number: number || String(r),
       title,
+      website,
+      lowEst,
+      highEst,
+      startPrice,
       estimate,
     });
   }

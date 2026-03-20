@@ -59,7 +59,11 @@ export default function RegisterPage() {
         return;
       }
       const path = parsed.pathname;
-      const allowed = path === "/" || path === "/bid" || path.startsWith("/bid/");
+      const allowed =
+        path === "/" ||
+        path === "/bid" ||
+        path.startsWith("/bid/") ||
+        path.startsWith("/auction/");
       setSafeReturnUrl(allowed ? `${parsed.pathname}${parsed.search}` : "/");
     } catch {
       setSafeReturnUrl("/");
