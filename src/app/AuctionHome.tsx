@@ -12,7 +12,6 @@ export function AuctionHome() {
   const router = useRouter();
   const [user, setUser] = useState<User | null>(null);
   const [hasCard, setHasCard] = useState<boolean | null>(null);
-  const [lotTitle, setLotTitle] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [authError, setAuthError] = useState<string | null>(null);
 
@@ -142,13 +141,6 @@ export function AuctionHome() {
     };
   }, []);
 
-  useEffect(() => {
-    get(ref(db, "auctions/current")).then((snap) => {
-      const lot = snap.val();
-      if (lot?.title) setLotTitle(lot.title);
-    });
-  }, []);
-
   if (loading) {
     return (
       <>
@@ -211,11 +203,6 @@ export function AuctionHome() {
           <p className="auction-hero-tag">LIVE AUCTION</p>
           <h1 className="auction-hero-title">YES AUCTION</h1>
           <p className="auction-hero-sub">现场拍卖 · 代理出价 · 安全登记</p>
-          {lotTitle ? (
-            <p className="auction-hero-lot">
-              当前关注：<span className="gold">{lotTitle}</span>
-            </p>
-          ) : null}
         </div>
 
         <AuctionCatalogSection user={user} authLoading={false} />
@@ -243,9 +230,6 @@ export function AuctionHome() {
                 您已登记，可直接设置代理出价或观看直播。
               </p>
               <div className="auction-actions">
-                <Link href="/bid" className="btn">
-                  代理出价
-                </Link>
                 <button type="button" className="btn-outline" onClick={() => auth.signOut()}>
                   切换账户
                 </button>

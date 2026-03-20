@@ -1017,22 +1017,6 @@ body {
 }
 
 /* ── Auction lot catalog (/auction/[id]) ── */
-.auction-lots-header-bid {
-  font-size: 12px;
-  font-weight: 600;
-  color: var(--gold);
-  text-decoration: none;
-  padding: 6px 10px;
-  border: 1px solid var(--border);
-  border-radius: 4px;
-  background: transparent;
-}
-
-.auction-lots-header-bid:hover {
-  color: var(--text);
-  border-color: var(--gold);
-}
-
 .auction-lots-catalog {
   padding-bottom: 48px;
 }

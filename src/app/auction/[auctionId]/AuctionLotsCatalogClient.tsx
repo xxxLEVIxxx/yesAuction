@@ -281,9 +281,7 @@ export function AuctionLotsCatalogClient() {
         <div className="logo">
           YES <em>AUCTION</em>
         </div>
-        <Link href="/bid" className="auction-lots-header-bid">
-          代理出价
-        </Link>
+        <div className="header-spacer" aria-hidden />
       </header>
 
       <main className="wrap auction-home auction-lots-catalog">
