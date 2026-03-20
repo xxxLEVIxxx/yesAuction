@@ -1099,6 +1099,34 @@ body {
   background: rgba(240, 215, 140, 0.08);
 }
 
+.auction-lots-estimate-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 6px 12px;
+  margin: 0 0 2px;
+}
+
+.auction-lots-estimate-row .auction-lots-estimate {
+  margin: 0;
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.auction-lots-estimate-row .auction-lots-my-bid-amount {
+  margin: 0;
+  flex: 0 0 auto;
+  text-align: right;
+  max-width: 100%;
+}
+
+.auction-lots-my-bid-amount {
+  font-size: 13px;
+  color: var(--gold);
+  line-height: 1.4;
+}
+
 .auction-lots-count {
   font-size: 12px;
   color: var(--muted);
@@ -1226,6 +1254,7 @@ body {
   color: var(--muted);
   margin: 0;
 }
+
 
 .auction-lots-estimate span {
   color: var(--text);

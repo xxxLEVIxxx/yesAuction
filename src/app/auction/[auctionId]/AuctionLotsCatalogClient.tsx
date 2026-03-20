@@ -13,6 +13,7 @@ import {
 } from "@/lib/auctionCatalog";
 import { parseRoundRows, type AuctionRoundRow } from "@/lib/auctionRounds";
 import { buildEstimate } from "@/lib/importLotsFromSpreadsheet";
+import { fmt } from "@/components/BidLotClient";
 
 type LotRow = {
   id: string;
@@ -29,6 +30,8 @@ type LotRow = {
 };
 
 const UNASSIGNED_TAB = "__unassigned__";
+/** Tab: lots in this auction where the user has a proxy bid */
+const MY_BIDS_TAB = "__my_bids__";
 
 function displayEstimate(l: LotRow): string {
   const e = l.estimate?.trim();
@@ -71,15 +74,8 @@ function sortLots(a: LotRow, b: LotRow): number {
 
 function lotMatchesQuery(l: LotRow, q: string): boolean {
   if (!q.trim()) return true;
-  const hay = [
-    l.number,
-    l.title,
-    displayEstimate(l),
-    l.startPrice,
-    l.lowEst,
-    l.highEst,
-    l.website,
-  ]
+  /** Exclude estimate / start / low-high — search by LOT, title, website only (no price search). */
+  const hay = [l.number, l.title, l.website]
     .filter(Boolean)
     .join(" ")
     .toLowerCase();
@@ -106,6 +102,8 @@ export function AuctionLotsCatalogClient() {
   const [authUser, setAuthUser] = useState<User | null>(null);
   /** lotId → user has a proxy bid on this lot */
   const [userBidOnLot, setUserBidOnLot] = useState<Record<string, boolean>>({});
+  /** lotId → proxy max amount (for「我的出价」tab) */
+  const [userBidAmount, setUserBidAmount] = useState<Record<string, number>>({});
 
   useEffect(() => {
     const unsub = onAuthStateChanged(auth, setAuthUser);
@@ -118,6 +116,7 @@ export function AuctionLotsCatalogClient() {
   useEffect(() => {
     if (!authUser?.uid || lots.length === 0) {
       setUserBidOnLot({});
+      setUserBidAmount({});
       return;
     }
     const uid = authUser.uid;
@@ -129,12 +128,19 @@ export function AuctionLotsCatalogClient() {
           const v = snap.exists() ? Number(snap.val()) : 0;
           const has = Number.isFinite(v) && v > 0;
           setUserBidOnLot((prev) => ({ ...prev, [l.id]: has }));
+          setUserBidAmount((prev) => {
+            const next = { ...prev };
+            if (has) next[l.id] = v;
+            else delete next[l.id];
+            return next;
+          });
         }),
       );
     }
     return () => {
       unsubs.forEach((u) => u());
       setUserBidOnLot({});
+      setUserBidAmount({});
     };
   }, [authUser?.uid, lotIdsKey, lots]);
 
@@ -206,13 +212,19 @@ export function AuctionLotsCatalogClient() {
   const roundIdSet = useMemo(() => new Set(rounds.map((r) => r.id)), [rounds]);
 
   const tabIds = useMemo(() => {
-    const ids = rounds.map((r) => r.id);
-    const hasUnassigned = lots.some(
-      (l) => l.roundId === undefined || l.roundId === "" || !roundIdSet.has(l.roundId),
-    );
-    if (hasUnassigned) ids.push(UNASSIGNED_TAB);
+    const ids: string[] = [];
+    if (rounds.length > 0) {
+      ids.push(...rounds.map((r) => r.id));
+      const hasUnassigned = lots.some(
+        (l) => l.roundId === undefined || l.roundId === "" || !roundIdSet.has(l.roundId),
+      );
+      if (hasUnassigned) ids.push(UNASSIGNED_TAB);
+    } else if (authUser) {
+      ids.push("");
+    }
+    if (authUser) ids.push(MY_BIDS_TAB);
     return ids;
-  }, [rounds, lots, roundIdSet]);
+  }, [rounds, lots, roundIdSet, authUser]);
 
   useEffect(() => {
     if (!activeTab) return;
@@ -222,6 +234,9 @@ export function AuctionLotsCatalogClient() {
   }, [tabIds, activeTab]);
 
   const lotsInTab = useMemo(() => {
+    if (activeTab === MY_BIDS_TAB) {
+      return lots.filter((l) => userBidOnLot[l.id]);
+    }
     if (rounds.length === 0) {
       return lots;
     }
@@ -231,7 +246,7 @@ export function AuctionLotsCatalogClient() {
       );
     }
     return lots.filter((l) => l.roundId === activeTab);
-  }, [lots, activeTab, rounds.length, roundIdSet]);
+  }, [lots, activeTab, rounds.length, roundIdSet, userBidOnLot]);
 
   const filteredLots = useMemo(() => {
     return lotsInTab.filter((l) => lotMatchesQuery(l, search));
@@ -307,7 +322,7 @@ export function AuctionLotsCatalogClient() {
               ref={searchInputRef}
               type="search"
               className="auction-lots-search-input"
-              placeholder="快速搜索：LOT、标题、估价、起拍价…"
+              placeholder="快速搜索：LOT、标题、官网…"
               value={search}
               onChange={(e) => setSearch(e.target.value)}
               autoComplete="off"
@@ -318,29 +333,54 @@ export function AuctionLotsCatalogClient() {
           </button>
         </div>
 
-        {rounds.length > 0 ? (
-          <div className="auction-lots-tabs" role="tablist" aria-label="拍卖轮次">
-            {rounds.map((r) => (
+        {tabIds.length > 0 ? (
+          <div className="auction-lots-tabs" role="tablist" aria-label="拍品分类">
+            {rounds.length > 0 ? (
+              <>
+                {rounds.map((r) => (
+                  <button
+                    key={r.id}
+                    type="button"
+                    role="tab"
+                    aria-selected={activeTab === r.id}
+                    className={`auction-lots-tab ${activeTab === r.id ? "is-active" : ""}`}
+                    onClick={() => setActiveTab(r.id)}
+                  >
+                    {r.label}
+                  </button>
+                ))}
+                {tabIds.includes(UNASSIGNED_TAB) ? (
+                  <button
+                    type="button"
+                    role="tab"
+                    aria-selected={activeTab === UNASSIGNED_TAB}
+                    className={`auction-lots-tab ${activeTab === UNASSIGNED_TAB ? "is-active" : ""}`}
+                    onClick={() => setActiveTab(UNASSIGNED_TAB)}
+                  >
+                    未分轮次
+                  </button>
+                ) : null}
+              </>
+            ) : (
               <button
-                key={r.id}
                 type="button"
                 role="tab"
-                aria-selected={activeTab === r.id}
-                className={`auction-lots-tab ${activeTab === r.id ? "is-active" : ""}`}
-                onClick={() => setActiveTab(r.id)}
+                aria-selected={activeTab === ""}
+                className={`auction-lots-tab ${activeTab === "" ? "is-active" : ""}`}
+                onClick={() => setActiveTab("")}
               >
-                {r.label}
+                全部拍品
               </button>
-            ))}
-            {tabIds.includes(UNASSIGNED_TAB) ? (
+            )}
+            {authUser ? (
               <button
                 type="button"
                 role="tab"
-                aria-selected={activeTab === UNASSIGNED_TAB}
-                className={`auction-lots-tab ${activeTab === UNASSIGNED_TAB ? "is-active" : ""}`}
-                onClick={() => setActiveTab(UNASSIGNED_TAB)}
+                aria-selected={activeTab === MY_BIDS_TAB}
+                className={`auction-lots-tab auction-lots-tab-my-bids ${activeTab === MY_BIDS_TAB ? "is-active" : ""}`}
+                onClick={() => setActiveTab(MY_BIDS_TAB)}
               >
-                未分轮次
+                我的出价
               </button>
             ) : null}
           </div>
@@ -353,7 +393,11 @@ export function AuctionLotsCatalogClient() {
 
         {filteredLots.length === 0 ? (
           <p className="admin-muted" style={{ marginTop: 16 }}>
-            {lotsInTab.length === 0 ? "该轮次暂无拍品。" : "没有符合搜索条件的拍品。"}
+            {activeTab === MY_BIDS_TAB && lotsInTab.length === 0
+              ? "您尚未对本场任何拍品设置代理出价。"
+              : lotsInTab.length === 0
+                ? "该轮次暂无拍品。"
+                : "没有符合搜索条件的拍品。"}
           </p>
         ) : (
           <ul className="auction-lots-list">
@@ -373,9 +417,16 @@ export function AuctionLotsCatalogClient() {
                     <span className="auction-lots-start">起拍 {l.startPrice?.trim() || "—"}</span>
                   </div>
                   <h2 className="auction-lots-title">{l.title || "—"}</h2>
-                  <p className="auction-lots-estimate">
-                    估价 <span>{displayEstimate(l) || "—"}</span>
-                  </p>
+                  <div className="auction-lots-estimate-row">
+                    <p className="auction-lots-estimate">
+                      估价 <span>{displayEstimate(l) || "—"}</span>
+                    </p>
+                    {authUser && userBidAmount[l.id] ? (
+                      <p className="auction-lots-my-bid-amount">
+                        您的出价上限 <strong>{fmt(userBidAmount[l.id])}</strong>
+                      </p>
+                    ) : null}
+                  </div>
                   <span className="auction-lots-item-cta">代理出价 →</span>
                 </Link>
                 {l.website?.trim() ? (
