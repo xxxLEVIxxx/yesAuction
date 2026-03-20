@@ -84,7 +84,7 @@ export function AuctionCatalogSection({ user, authLoading }: Props) {
                   <span className="auction-catalog-item-title">{a.title}</span>
                   <span className="auction-catalog-item-actions">
                     <Link href={`/auction/${a.id}`} className="auction-catalog-item-link auction-catalog-item-link--bid">
-                      出价目录
+                      预出价目录
                     </Link>
                     <a
                       href={MAIN_AUCTION_SITE}
@@ -122,7 +122,7 @@ export function AuctionCatalogSection({ user, authLoading }: Props) {
                   <span className="auction-catalog-item-title">{a.title}</span>
                   <span className="auction-catalog-item-actions">
                     <Link href={`/auction/${a.id}`} className="auction-catalog-item-link auction-catalog-item-link--bid">
-                      出价目录
+                      预出价目录
                     </Link>
                     <a
                       href={MAIN_AUCTION_SITE}

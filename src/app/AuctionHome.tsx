@@ -202,7 +202,7 @@ export function AuctionHome() {
         <div className="auction-hero">
           <p className="auction-hero-tag">LIVE AUCTION</p>
           <h1 className="auction-hero-title">YES AUCTION</h1>
-          <p className="auction-hero-sub">现场拍卖 · 代理出价 · 安全登记</p>
+          <p className="auction-hero-sub">现场拍卖 · 预出价 · 安全登记</p>
         </div>
 
         <AuctionCatalogSection user={user} authLoading={false} />
@@ -214,7 +214,7 @@ export function AuctionHome() {
               <p className="auction-card-text">
                 您好，<strong>{user.displayName || user.email}</strong>
                 <br />
-                尚未完成信用卡登记，请继续完成登记后即可出价。
+                尚未完成信用卡登记，请继续完成登记后即可预出价。
               </p>
               <div className="auction-actions">
                 <Link href={`/register?return=${encodeURIComponent("/")}&uid=${user.uid}`} className="btn">
@@ -227,7 +227,7 @@ export function AuctionHome() {
               <p className="auction-card-text">
                 欢迎回来，<strong>{user.displayName || user.email}</strong>
                 <br />
-                您已登记，可直接设置代理出价或观看直播。
+                您已登记，可直接设置预出价或观看直播。
               </p>
               <div className="auction-actions">
                 <button type="button" className="btn-outline" onClick={() => auth.signOut()}>
@@ -238,7 +238,7 @@ export function AuctionHome() {
           )}
         </section>
 
-        <p className="auction-footnote">本站首页为拍卖入口；登记与出价功能见上方按钮。</p>
+        <p className="auction-footnote">本站首页为拍卖入口；登记与预出价功能见上方按钮。</p>
       </main>
     </>
   );

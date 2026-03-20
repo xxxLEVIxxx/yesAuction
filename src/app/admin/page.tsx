@@ -18,7 +18,7 @@ export default function AdminDashboardPage() {
         <div className="admin-kpi-card">
           <div className="admin-kpi-label">待处理事项</div>
           <div className="admin-kpi-value">—</div>
-          <div className="admin-kpi-hint">出价审核、绑卡异常等</div>
+          <div className="admin-kpi-hint">预出价审核、绑卡异常等</div>
         </div>
       </div>
 

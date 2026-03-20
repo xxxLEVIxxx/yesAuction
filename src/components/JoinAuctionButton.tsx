@@ -115,9 +115,9 @@ export function JoinAuctionButton({ auctionId, auctionTitle, user, authLoading }
     if (request.processed && request.depositStatus === "waived") {
       return (
         <div className="auction-join-row auction-join-row--stack">
-          <p className="auction-join-hint">审核结果：免保证金，可参与代理出价</p>
+          <p className="auction-join-hint">审核结果：免保证金，可参与预出价</p>
           <Link href={`/auction/${auctionId}`} className="btn auction-join-btn">
-            浏览拍品 / 出价
+            浏览拍品 / 预出价
           </Link>
         </div>
       );

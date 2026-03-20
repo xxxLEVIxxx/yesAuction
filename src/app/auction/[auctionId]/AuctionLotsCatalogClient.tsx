@@ -30,7 +30,7 @@ type LotRow = {
 };
 
 const UNASSIGNED_TAB = "__unassigned__";
-/** Tab: lots in this auction where the user has a proxy bid */
+/** Tab: 我的预出价 — lots where the user has placed a pre-bid */
 const MY_BIDS_TAB = "__my_bids__";
 
 function displayEstimate(l: LotRow): string {
@@ -100,9 +100,9 @@ export function AuctionLotsCatalogClient() {
   const [search, setSearch] = useState("");
   const searchInputRef = useRef<HTMLInputElement>(null);
   const [authUser, setAuthUser] = useState<User | null>(null);
-  /** lotId → user has a proxy bid on this lot */
+  /** lotId → user has a pre-bid on this lot */
   const [userBidOnLot, setUserBidOnLot] = useState<Record<string, boolean>>({});
-  /** lotId → proxy max amount (for「我的出价」tab) */
+  /** lotId → pre-bid max amount (for「我的预出价」tab) */
   const [userBidAmount, setUserBidAmount] = useState<Record<string, number>>({});
 
   useEffect(() => {
@@ -112,7 +112,7 @@ export function AuctionLotsCatalogClient() {
 
   const lotIdsKey = useMemo(() => lots.map((l) => l.id).sort().join(","), [lots]);
 
-  /** Live `itemBids/{lotId}/{uid}/amount` — shows 已出价 when amount > 0 */
+  /** Live `itemBids/{lotId}/{uid}/amount` — shows 已预出价 when amount > 0 */
   useEffect(() => {
     if (!authUser?.uid || lots.length === 0) {
       setUserBidOnLot({});
@@ -380,7 +380,7 @@ export function AuctionLotsCatalogClient() {
                 className={`auction-lots-tab auction-lots-tab-my-bids ${activeTab === MY_BIDS_TAB ? "is-active" : ""}`}
                 onClick={() => setActiveTab(MY_BIDS_TAB)}
               >
-                我的出价
+                我的预出价
               </button>
             ) : null}
           </div>
@@ -394,7 +394,7 @@ export function AuctionLotsCatalogClient() {
         {filteredLots.length === 0 ? (
           <p className="admin-muted" style={{ marginTop: 16 }}>
             {activeTab === MY_BIDS_TAB && lotsInTab.length === 0
-              ? "您尚未对本场任何拍品设置代理出价。"
+              ? "您尚未对本场任何拍品设置预出价。"
               : lotsInTab.length === 0
                 ? "该轮次暂无拍品。"
                 : "没有符合搜索条件的拍品。"}
@@ -411,7 +411,7 @@ export function AuctionLotsCatalogClient() {
                     <div className="auction-lots-item-left">
                       <span className="auction-lots-lotnum">LOT {l.number || "—"}</span>
                       {authUser && userBidOnLot[l.id] ? (
-                        <span className="auction-lots-bid-badge">已出价</span>
+                        <span className="auction-lots-bid-badge">已预出价</span>
                       ) : null}
                     </div>
                     <span className="auction-lots-start">起拍 {l.startPrice?.trim() || "—"}</span>
@@ -423,11 +423,11 @@ export function AuctionLotsCatalogClient() {
                     </p>
                     {authUser && userBidAmount[l.id] ? (
                       <p className="auction-lots-my-bid-amount">
-                        您的出价上限 <strong>{fmt(userBidAmount[l.id])}</strong>
+                        您的预出价上限 <strong>{fmt(userBidAmount[l.id])}</strong>
                       </p>
                     ) : null}
                   </div>
-                  <span className="auction-lots-item-cta">代理出价 →</span>
+                  <span className="auction-lots-item-cta">预出价 →</span>
                 </Link>
                 {l.website?.trim() ? (
                   <a

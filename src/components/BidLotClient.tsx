@@ -88,7 +88,7 @@ export function BidLotClient({
   const [currentUser, setCurrentUser] = useState<User | null>(null);
   const [bidderNumber, setBidderNumber] = useState<number | null>(null);
   const [errMsg, setErrMsg] = useState("");
-  /** Current proxy max from RTDB `itemBids/{lotId}/{uid}/amount` */
+  /** Current pre-bid max from RTDB `itemBids/{lotId}/{uid}/amount` */
   const [existingBidAmount, setExistingBidAmount] = useState<number | null>(null);
   const [bidFetchDone, setBidFetchDone] = useState(false);
   /** Show drum (true) vs summary line (false when already have a bid). */
@@ -118,7 +118,7 @@ export function BidLotClient({
     [prices, lot, initialMinBid],
   );
 
-  /** Drum floor: start price, or current bid when modifying (proxy bids can only go up). */
+  /** Drum floor: start price, or current bid when modifying (pre-bids can only go up). */
   const drumMinIdx = useMemo(() => {
     let m = minSelectableIdx;
     if (editingBid && existingBidAmount != null && existingBidAmount > 0) {
@@ -180,7 +180,7 @@ export function BidLotClient({
     return () => unsub();
   }, [currentUser, auctionIdForJoin]);
 
-  /** Admin must approve join; only `waived` may use proxy bid here (`pay_required` → deposit link via JoinAuctionButton). */
+  /** Admin must approve join; only `waived` may place pre-bids here (`pay_required` → deposit link via JoinAuctionButton). */
   const canPlaceBid = useMemo(() => {
     if (!auctionIdForJoin) return true;
     if (!joinReady) return false;
@@ -339,7 +339,7 @@ export function BidLotClient({
       const existingAmountSnap = await get(ref(db, `itemBids/${targetLotId}/${currentUser.uid}/amount`));
       const existingAmount = existingAmountSnap.exists() ? Number(existingAmountSnap.val()) : 0;
       if (existingAmount > 0 && amount < existingAmount) {
-        throw new Error("每件拍品的代理出价只能提高，不能降低");
+        throw new Error("每件拍品的预出价只能提高，不能降低");
       }
 
       const now = Date.now();
@@ -518,7 +518,7 @@ export function BidLotClient({
             {auctionIdForJoin && joinReady && !canPlaceBid ? (
               <section className="card bid-join-gate-card">
                 <p className="sec-sub" style={{ marginBottom: 14 }}>
-                  本场拍品需先通过管理员参拍审核。审核通过并免保证金后，您可在此设置代理出价。
+                  本场拍品需先通过管理员参拍审核。审核通过并免保证金后，您可在此设置预出价。
                 </p>
                 <JoinAuctionButton
                   auctionId={auctionIdForJoin}
@@ -531,20 +531,20 @@ export function BidLotClient({
 
             {!bidFetchDone && activeLotId && canPlaceBid ? (
               <p className="sec-sub" style={{ marginBottom: 16 }}>
-                正在同步您的出价信息…
+                正在同步您的预出价信息…
               </p>
             ) : null}
 
             {bidFetchDone && canPlaceBid && activeLotId && existingBidAmount != null && !editingBid ? (
               <section className="card bid-current-card">
                 <p className="bid-current-line">
-                  您当前的代理出价为 <strong className="bid-current-amt">{fmt(existingBidAmount)}</strong>
+                  您当前的预出价为 <strong className="bid-current-amt">{fmt(existingBidAmount)}</strong>
                 </p>
                 <p className="sec-sub" style={{ marginBottom: 14 }}>
                   如需提高上限，请点击修改（不可降低）。
                 </p>
                 <button type="button" className="btn-outline bid-modify-btn" onClick={openModifyBid}>
-                  修改出价
+                  修改预出价
                 </button>
               </section>
             ) : null}
@@ -552,10 +552,10 @@ export function BidLotClient({
             {bidFetchDone && canPlaceBid && activeLotId && editingBid ? (
               <>
                 <div className="sec-sub" style={{ marginBottom: 8 }}>
-                  {existingBidAmount != null ? "调整您的最高出价" : "设定您的最高出价"}
+                  {existingBidAmount != null ? "调整您的预出价上限" : "设定您的预出价上限"}
                 </div>
                 <button type="button" className="btn-link" style={{ marginTop: 0, marginBottom: 8 }} onClick={() => setHowOpen(true)}>
-                  如何进行代理竞价 →
+                  如何进行预出价 →
                 </button>
 
                 <section className="card">
@@ -599,12 +599,12 @@ export function BidLotClient({
                   </div>
 
                   <div className="summary">
-                    <div>您的最高出价: {fmt(prices[selectedIdx])}</div>
+                    <div>您的预出价上限: {fmt(prices[selectedIdx])}</div>
                     <div>每口加价: +{fmt(getInc(prices[selectedIdx]))}</div>
                   </div>
 
                   <div className="sec-sub" style={{ marginBottom: 12 }}>
-                    此为代理出价，拍卖开始前不会扣款。系统将自动为您出价，直至您的最高限额。
+                    此为预出价，拍卖开始前不会扣款。系统将自动为您出价，直至您的预出价上限。
                   </div>
                   {errMsg ? <div className="error">{errMsg}</div> : null}
                   <div className="bid-edit-actions">
@@ -614,7 +614,7 @@ export function BidLotClient({
                       disabled={submitting || (resolvedLotId ? !activeLotId || !lot : !activeLotId)}
                       onClick={submitBid}
                     >
-                      {submitting ? "提交中…" : existingBidAmount != null ? "确认修改" : "提交代理出价"}
+                      {submitting ? "提交中…" : existingBidAmount != null ? "确认修改" : "提交预出价"}
                     </button>
                     {existingBidAmount != null ? (
                       <button type="button" className="btn-link bid-cancel-edit" onClick={() => setEditingBid(false)}>
@@ -632,21 +632,21 @@ export function BidLotClient({
           <button type="button" className="modal-close" onClick={() => setHowOpen(false)}>
             ✕
           </button>
-          <div className="modal-title">如何进行代理竞价？</div>
+          <div className="modal-title">如何进行预出价？</div>
           <div className="modal-body">
-            <strong>什么是代理出价？</strong>
+            <strong>什么是预出价？</strong>
             <br />
-            您只需设定愿意支付的最高金额，系统会在拍卖中自动以最低必要价格出价。
+            您只需设定愿意支付的最高金额（预出价上限），系统会在拍卖中自动以最低必要价格出价。
             <br />
             <br />
             <strong>举例说明</strong>
             <br />
-            若您设定最高出价 $5,000，当前竞价为 $2,000，系统代您出价 $2,250。
+            若您设定预出价上限 $5,000，当前竞价为 $2,000，系统代您出价 $2,250。
             <br />
             <br />
             <strong>何时扣款？</strong>
             <br />
-            提交代理出价时不会扣款，仅在您成功赢得拍品后才会收费。
+            提交预出价时不会扣款，仅在您成功赢得拍品后才会收费。
           </div>
         </div>
       </div>

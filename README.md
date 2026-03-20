@@ -14,9 +14,9 @@ This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-
 
 **Env:** `NEXT_PUBLIC_MAIN_SITE_URL` — optional. Homepage auction cards link **官网拍品目录** to this URL (defaults to `https://theyesauction.com`).
 
-**Public catalog:** `/auction/[auctionId]` lists rounds (tabs) and lots (LOT、标题、估价、起拍价) with search; linked from homepage **出价目录** and from approved join requests (**浏览拍品 / 出价**). Each lot links to **`/auction/[auctionId]/lot/[lotId]`** (proxy bid UI, same as `/bid` with lot context). Global proxy bidding without a lot remains at `/bid`.
+**Public catalog:** `/auction/[auctionId]` lists rounds (tabs) and lots (LOT、标题、估价、起拍价) with search; linked from homepage **预出价目录** and from approved join requests (**浏览拍品 / 预出价**). Each lot links to **`/auction/[auctionId]/lot/[lotId]`** (pre-bid UI, same as `/bid` with lot context). Global pre-bidding without a lot remains at `/bid`.
 
-**Proxy / pre-bids:** written to **`itemBids/{lotId}/{userId}`**, **`absenteeBids/{lotId}/{userId}`**, and **`itemBidHistory/{lotId}/{pushId}`** (see `BidLotClient`). The bid page reads **`itemBids/.../amount`** to show “当前代理出价” and allows **修改** (increase-only).
+**预出价 (pre-bids):** written to **`itemBids/{lotId}/{userId}`**, **`absenteeBids/{lotId}/{userId}`**, and **`itemBidHistory/{lotId}/{pushId}`** (see `BidLotClient`). The bid page reads **`itemBids/.../amount`** to show “当前预出价” and allows **修改** (increase-only).
 
 **Mobile / LAN dev:** Open the app via `http://192.168.x.x:3000` only if that host is added in **Firebase Console → Authentication → Settings → Authorized domains** (e.g. `192.168.1.112`). Otherwise Auth may not finish and the home page can stay on loading until timeouts.
 
