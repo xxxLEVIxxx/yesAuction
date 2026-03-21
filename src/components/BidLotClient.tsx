@@ -9,6 +9,7 @@ import { auth, db } from "@/lib/firebase";
 import { JoinAuctionButton } from "@/components/JoinAuctionButton";
 import { parseJoinRequest, type JoinRequestRow } from "@/lib/auctionJoinRequests";
 import { buildEstimate } from "@/lib/importLotsFromSpreadsheet";
+import { buildBidPriceLadder, getBidIncrement } from "@/lib/bidIncrements";
 import { minPriceIndexFromStart } from "@/lib/lotBid";
 
 type Lot = {
@@ -28,34 +29,9 @@ function displayEstimate(l: Lot): string {
   return buildEstimate(l.lowEst?.trim() || "", l.highEst?.trim() || "", "");
 }
 
-function getInc(p: number) {
-  if (p < 200) return 10;
-  if (p < 500) return 25;
-  if (p < 1000) return 50;
-  if (p < 2000) return 100;
-  if (p < 5000) return 250;
-  if (p < 10000) return 500;
-  if (p < 20000) return 1000;
-  if (p < 50000) return 2500;
-  if (p < 100000) return 5000;
-  if (p < 500000) return 10000;
-  if (p < 1000000) return 20000;
-  return 50000;
-}
-
 export function fmt(n: number) {
   if (n >= 1000000) return `$${(n / 1000000).toFixed(n % 1000000 === 0 ? 0 : 1)}M`;
   return `$${Number(n).toLocaleString("en-US")}`;
-}
-
-function buildPrices() {
-  const out: number[] = [];
-  let p = 10;
-  while (p <= 5000000) {
-    out.push(p);
-    p += getInc(p);
-  }
-  return out;
 }
 
 export type BidLotClientProps = {
@@ -80,7 +56,7 @@ export function BidLotClient({
   backLabel,
 }: BidLotClientProps) {
   const router = useRouter();
-  const prices = useMemo(buildPrices, []);
+  const prices = useMemo(() => buildBidPriceLadder(), []);
   const [selectedIdx, setSelectedIdx] = useState(0);
   const drumRef = useRef<HTMLDivElement>(null);
   const [loading, setLoading] = useState(true);
@@ -131,6 +107,18 @@ export function BidLotClient({
   useEffect(() => {
     setSelectedIdx((prev) => Math.max(drumMinIdx, prev));
   }, [drumMinIdx]);
+
+  /** Clamped index so drum highlight, summary, and submit always agree (same as visible row). */
+  const effectiveIdx = useMemo(() => {
+    if (prices.length === 0) return 0;
+    return Math.min(Math.max(selectedIdx, drumMinIdx), prices.length - 1);
+  }, [selectedIdx, drumMinIdx, prices.length]);
+
+  useEffect(() => {
+    if (effectiveIdx !== selectedIdx) {
+      setSelectedIdx(effectiveIdx);
+    }
+  }, [effectiveIdx, selectedIdx]);
 
   useEffect(() => {
     bidUiInitRef.current = false;
@@ -332,7 +320,7 @@ export function BidLotClient({
     if (!canPlaceBid) return;
     setErrMsg("");
     setSubmitting(true);
-    const amount = prices[selectedIdx];
+    const amount = prices[effectiveIdx];
     const targetLotId = activeLotId || resolvedLotId || "general";
 
     try {
@@ -426,14 +414,21 @@ export function BidLotClient({
   const clamp = (v: number, mn: number, mx: number) => Math.min(Math.max(v, mn), mx);
   /** Only render prices at/above the drum floor — hides lower amounts in the drum. */
   const displayPrices = prices.slice(drumMinIdx);
-  const relativeIdx = selectedIdx - drumMinIdx;
+  const relativeIdx = effectiveIdx - drumMinIdx;
   const y = 272 / 2 - ITEM_H / 2 - (relativeIdx + PAD) * ITEM_H;
+
+  const selectedAmount = prices[effectiveIdx];
+  /** Next step on the ladder (must match drum rows; same as getBidIncrement at this level). */
+  const incrementToNext =
+    effectiveIdx < prices.length - 1
+      ? prices[effectiveIdx + 1] - selectedAmount
+      : getBidIncrement(selectedAmount);
 
   function beginDrag(clientY: number) {
     dragRef.current.dragging = true;
     dragRef.current.startY = clientY;
     dragRef.current.lastY = clientY;
-    dragRef.current.startIdx = selectedIdx;
+    dragRef.current.startIdx = effectiveIdx;
     dragRef.current.vel = 0;
     setAnimateDrum(false);
   }
@@ -455,7 +450,7 @@ export function BidLotClient({
     dragRef.current.dragging = false;
     setAnimateDrum(true);
     const next = clamp(
-      selectedIdx + Math.round(-dragRef.current.vel * 0.3),
+      effectiveIdx + Math.round(-dragRef.current.vel * 0.3),
       drumMinIdx,
       prices.length - 1,
     );
@@ -599,8 +594,8 @@ export function BidLotClient({
                   </div>
 
                   <div className="summary">
-                    <div>您的预出价上限: {fmt(prices[selectedIdx])}</div>
-                    <div>每口加价: +{fmt(getInc(prices[selectedIdx]))}</div>
+                    <div>您的预出价上限: {fmt(selectedAmount)}</div>
+                    <div>每口加价: +{fmt(incrementToNext)}</div>
                   </div>
 
                   <div className="sec-sub" style={{ marginBottom: 12 }}>

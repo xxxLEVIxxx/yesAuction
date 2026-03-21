@@ -4,7 +4,7 @@ export function guessMinBidFromStartPrice(s: string | undefined): number {
   const m = s.replace(/,/g, "").match(/[\d.]+/);
   if (!m) return 100;
   const n = Number(m[0]);
-  return Number.isFinite(n) && n > 0 ? Math.max(10, Math.floor(n)) : 100;
+  return Number.isFinite(n) && n > 0 ? Math.max(25, Math.floor(n)) : 100;
 }
 
 /**
