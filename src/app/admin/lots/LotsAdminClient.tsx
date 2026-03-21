@@ -15,6 +15,7 @@ import {
 } from "@/lib/auctionCatalog";
 import type { AuctionRoundRow } from "@/lib/auctionRounds";
 import { parseRoundRows, parseRoundsTree } from "@/lib/auctionRounds";
+import { lotBidPath, lotBidUrl } from "@/lib/lotBidUrls";
 
 type LotRow = {
   id: string;
@@ -55,6 +56,8 @@ export function LotsAdminClient() {
   const [importing, setImporting] = useState(false);
   const [removingAll, setRemovingAll] = useState(false);
   const importFileRef = useRef<HTMLInputElement>(null);
+  /** "" = all auctions */
+  const [exportAuctionFilter, setExportAuctionFilter] = useState("");
 
   const load = useCallback(async () => {
     const [catSnap, lotsSnap, roundsSnap] = await Promise.all([
@@ -305,6 +308,101 @@ export function LotsAdminClient() {
     return buildEstimate(l.lowEst?.trim() || "", l.highEst?.trim() || "", "");
   }
 
+  const lotsForExport = exportAuctionFilter
+    ? lots.filter((l) => l.auctionId === exportAuctionFilter)
+    : lots;
+
+  function exportBaseUrl() {
+    if (typeof window === "undefined") return "";
+    return process.env.NEXT_PUBLIC_APP_ORIGIN?.replace(/\/$/, "") || window.location.origin;
+  }
+
+  function triggerDownload(filename: string, mime: string, body: string) {
+    const blob = new Blob([body], { type: mime });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = filename;
+    a.click();
+    URL.revokeObjectURL(url);
+  }
+
+  function csvEscapeCell(s: string) {
+    if (/[",\n\r]/.test(s)) return `"${s.replace(/"/g, '""')}"`;
+    return s;
+  }
+
+  function onExportJson() {
+    const base = exportBaseUrl();
+    const generatedAt = new Date().toISOString();
+    const payload = {
+      generatedAt,
+      baseUrl: base,
+      note:
+        "lotId = Firebase key at auctions/lots/{lotId}. bidPath is the site path for the pre-bid page; prepend baseUrl for absolute links.",
+      lots: lotsForExport.map((l) => {
+        const aid = l.auctionId || "";
+        const path = aid ? lotBidPath(aid, l.id) : "";
+        const url = aid && base ? lotBidUrl(base, aid, l.id) : "";
+        return {
+          lotId: l.id,
+          lotNumber: l.number ?? "",
+          auctionId: aid,
+          auctionTitle: auctionTitle(l.auctionId),
+          roundId: l.roundId ?? "",
+          roundLabel: roundLabel(l.auctionId, l.roundId),
+          title: l.title ?? "",
+          bidPath: path,
+          bidUrl: url,
+        };
+      }),
+    };
+    triggerDownload(
+      `lot-mapping-${generatedAt.slice(0, 10)}.json`,
+      "application/json;charset=utf-8",
+      `${JSON.stringify(payload, null, 2)}\n`,
+    );
+  }
+
+  function onExportCsv() {
+    const base = exportBaseUrl();
+    const headers = [
+      "lotId",
+      "lotNumber",
+      "auctionId",
+      "auctionTitle",
+      "roundId",
+      "roundLabel",
+      "title",
+      "bidPath",
+      "bidUrl",
+    ];
+    const lines = [headers.join(",")];
+    for (const l of lotsForExport) {
+      const aid = l.auctionId || "";
+      const path = aid ? lotBidPath(aid, l.id) : "";
+      const url = aid && base ? lotBidUrl(base, aid, l.id) : "";
+      const row = [
+        l.id,
+        l.number ?? "",
+        aid,
+        auctionTitle(l.auctionId),
+        l.roundId ?? "",
+        roundLabel(l.auctionId, l.roundId),
+        l.title ?? "",
+        path,
+        url,
+      ].map((c) => csvEscapeCell(String(c)));
+      lines.push(row.join(","));
+    }
+    const generatedAt = new Date().toISOString();
+    triggerDownload(
+      `lot-mapping-${generatedAt.slice(0, 10)}.csv`,
+      "text/csv;charset=utf-8",
+      `\uFEFF${lines.join("\n")}\n`,
+    );
+  }
+
   if (loading) {
     return <div className="admin-muted">加载中…</div>;
   }
@@ -318,6 +416,41 @@ export function LotsAdminClient() {
       </p>
 
       {err ? <div className="error admin-auction-alert">{err}</div> : null}
+
+      <section className="admin-card-block admin-auction-form-card">
+        <h2 className="admin-card-block-title">导出 LOT ↔ lotId（外链预出价页）</h2>
+        <p className="admin-page-desc" style={{ marginBottom: 12 }}>
+          下载映射表，将官网或其他站点上的 <strong>LOT 编号</strong> 对应到本站 RTDB 的{" "}
+          <code>lotId</code> 与预出价路径 <code>/auction/&#123;auctionId&#125;/lot/&#123;lotId&#125;</code>。
+          可选按场次筛选；<code>bidUrl</code> 使用当前站点域名（或设置{" "}
+          <code>NEXT_PUBLIC_APP_ORIGIN</code>）。
+        </p>
+        <div className="admin-auction-row2" style={{ marginBottom: 12 }}>
+          <label className="admin-auction-label">
+            导出范围
+            <select
+              className="admin-auction-input"
+              value={exportAuctionFilter}
+              onChange={(e) => setExportAuctionFilter(e.target.value)}
+            >
+              <option value="">全部场次（{lots.length} 条拍品）</option>
+              {auctions.map((a) => (
+                <option key={a.id} value={a.id}>
+                  {a.title} — {lots.filter((x) => x.auctionId === a.id).length} 条
+                </option>
+              ))}
+            </select>
+          </label>
+        </div>
+        <div className="admin-auction-actions">
+          <button type="button" className="admin-auction-btn secondary" onClick={onExportJson}>
+            下载 JSON
+          </button>
+          <button type="button" className="admin-auction-btn secondary" onClick={onExportCsv}>
+            下载 CSV
+          </button>
+        </div>
+      </section>
 
       <section className="admin-card-block admin-auction-form-card">
         <h2 className="admin-card-block-title">添加拍品（可稍后补充）</h2>

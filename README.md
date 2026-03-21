@@ -18,6 +18,8 @@ This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-
 
 **预出价 (pre-bids):** written to **`itemBids/{lotId}/{userId}`**, **`absenteeBids/{lotId}/{userId}`**, and **`itemBidHistory/{lotId}/{pushId}`** (see `BidLotClient`). The bid page reads **`itemBids/.../amount`** to show “当前预出价” and allows **修改** (increase-only).
 
+**LOT ↔ `lotId` export:** In **管理后台 → 拍品与场次** (`/admin/lots`), use **导出 LOT ↔ lotId** to download **JSON** or **CSV** with `lotNumber`, Firebase `lotId`, `auctionId`, and **`bidPath` / `bidUrl`** (`/auction/{auctionId}/lot/{lotId}`). Optional env **`NEXT_PUBLIC_APP_ORIGIN`** sets the domain in exported `bidUrl`. Helper: `lotBidPath` / `lotBidUrl` in `src/lib/lotBidUrls.ts`.
+
 **Mobile / LAN dev:** Open the app via `http://192.168.x.x:3000` only if that host is added in **Firebase Console → Authentication → Settings → Authorized domains** (e.g. `192.168.1.112`). Otherwise Auth may not finish and the home page can stay on loading until timeouts.
 
 ## Getting Started
