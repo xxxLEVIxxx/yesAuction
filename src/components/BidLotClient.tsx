@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { onAuthStateChanged, signOut, type User } from "firebase/auth";
 import { get, onValue, push, ref, update } from "firebase/database";
 import Link from "next/link";
@@ -86,7 +86,8 @@ export function BidLotClient({
     lastY: 0,
     vel: 0,
   });
-  const ITEM_H = 50;
+  /** Measured from DOM — CSS uses 50px desktop / 44px mobile; JS must match or drag & transform break on phones. */
+  const [drumMetrics, setDrumMetrics] = useState({ wrapH: 272, itemH: 50 });
   const PAD = 3;
 
   const minSelectableIdx = useMemo(
@@ -204,7 +205,7 @@ export function BidLotClient({
     else setEditingBid(true);
   }, [bidFetchDone, existingBidAmount]);
 
-  /** Wheel / touch: must be non-passive so the page behind does not scroll. Re-run when drum mounts (e.g. after loading). */
+  /** Wheel on drum — non-passive so the page does not scroll. Pointer + touch-action handles touch. */
   useEffect(() => {
     const el = drumRef.current;
     if (!el) return;
@@ -219,18 +220,39 @@ export function BidLotClient({
       });
     };
 
-    const onTouchMove = (e: TouchEvent) => {
-      e.preventDefault();
-    };
-
     el.addEventListener("wheel", onWheel, { passive: false });
-    el.addEventListener("touchmove", onTouchMove, { passive: false });
 
     return () => {
       el.removeEventListener("wheel", onWheel);
-      el.removeEventListener("touchmove", onTouchMove);
     };
   }, [drumMinIdx, prices.length, loading, lotMismatch, lotNotFound, editingBid, canPlaceBid]);
+
+  /** Match transform & drag step size to rendered row height (mobile uses smaller .drum-item). */
+  useLayoutEffect(() => {
+    if (!bidFetchDone || !canPlaceBid || !editingBid || !activeLotId) return;
+    const wrap = drumRef.current;
+    if (!wrap) return;
+
+    const measure = () => {
+      const first = wrap.querySelector(".drum-item") as HTMLElement | null;
+      const ih = first ? first.getBoundingClientRect().height : 0;
+      const wh = wrap.getBoundingClientRect().height;
+      if (ih > 0 && wh > 0) {
+        setDrumMetrics({ wrapH: wh, itemH: ih });
+      }
+    };
+
+    measure();
+    const ro = new ResizeObserver(() => {
+      requestAnimationFrame(measure);
+    });
+    ro.observe(wrap);
+    window.addEventListener("orientationchange", measure);
+    return () => {
+      ro.disconnect();
+      window.removeEventListener("orientationchange", measure);
+    };
+  }, [bidFetchDone, canPlaceBid, editingBid, activeLotId, drumMinIdx, lot?.startPrice]);
 
   useEffect(() => {
     const unsub = onAuthStateChanged(auth, async (user) => {
@@ -415,7 +437,9 @@ export function BidLotClient({
   /** Only render prices at/above the drum floor — hides lower amounts in the drum. */
   const displayPrices = prices.slice(drumMinIdx);
   const relativeIdx = effectiveIdx - drumMinIdx;
-  const y = 272 / 2 - ITEM_H / 2 - (relativeIdx + PAD) * ITEM_H;
+  const ih = drumMetrics.itemH;
+  const wh = drumMetrics.wrapH;
+  const y = wh / 2 - ih / 2 - (relativeIdx + PAD) * ih;
 
   const selectedAmount = prices[effectiveIdx];
   /** Next step on the ladder (must match drum rows; same as getBidIncrement at this level). */
@@ -438,7 +462,7 @@ export function BidLotClient({
     dragRef.current.vel = clientY - dragRef.current.lastY;
     dragRef.current.lastY = clientY;
     const next = clamp(
-      dragRef.current.startIdx + Math.round((dragRef.current.startY - clientY) / ITEM_H),
+      dragRef.current.startIdx + Math.round((dragRef.current.startY - clientY) / drumMetrics.itemH),
       drumMinIdx,
       prices.length - 1,
     );
@@ -449,12 +473,40 @@ export function BidLotClient({
     if (!dragRef.current.dragging) return;
     dragRef.current.dragging = false;
     setAnimateDrum(true);
+    const step = drumMetrics.itemH || 50;
     const next = clamp(
-      effectiveIdx + Math.round(-dragRef.current.vel * 0.3),
+      effectiveIdx + Math.round((-dragRef.current.vel * 0.3) / step),
       drumMinIdx,
       prices.length - 1,
     );
     setSelectedIdx(next);
+  }
+
+  function onDrumPointerDown(e: React.PointerEvent<HTMLDivElement>) {
+    if (e.pointerType === "mouse" && e.button !== 0) return;
+    try {
+      e.currentTarget.setPointerCapture(e.pointerId);
+    } catch {
+      /* Safari / older */
+    }
+    beginDrag(e.clientY);
+  }
+
+  function onDrumPointerMove(e: React.PointerEvent<HTMLDivElement>) {
+    if (!dragRef.current.dragging) return;
+    e.preventDefault();
+    moveDrag(e.clientY);
+  }
+
+  function onDrumPointerUp(e: React.PointerEvent<HTMLDivElement>) {
+    try {
+      if (e.currentTarget.hasPointerCapture?.(e.pointerId)) {
+        e.currentTarget.releasePointerCapture(e.pointerId);
+      }
+    } catch {
+      /* */
+    }
+    endDrag();
   }
 
   const est = lot ? displayEstimate(lot) : "";
@@ -557,16 +609,10 @@ export function BidLotClient({
                   <div
                     ref={drumRef}
                     className="drum-wrap"
-                    onMouseDown={(e) => beginDrag(e.clientY)}
-                    onMouseMove={(e) => moveDrag(e.clientY)}
-                    onMouseUp={endDrag}
-                    onMouseLeave={endDrag}
-                    onTouchStart={(e) => beginDrag(e.touches[0].clientY)}
-                    onTouchMove={(e) => {
-                      e.preventDefault();
-                      moveDrag(e.touches[0].clientY);
-                    }}
-                    onTouchEnd={endDrag}
+                    onPointerDown={onDrumPointerDown}
+                    onPointerMove={onDrumPointerMove}
+                    onPointerUp={onDrumPointerUp}
+                    onPointerCancel={onDrumPointerUp}
                   >
                     <div className="drum-sel" />
                     <div
