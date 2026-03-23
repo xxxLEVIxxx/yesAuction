@@ -30,6 +30,18 @@ type LotRow = {
   startPrice?: string;
 };
 
+type LotEditDraft = {
+  auctionId: string;
+  roundId: string;
+  number: string;
+  title: string;
+  estimate: string;
+  website: string;
+  lowEst: string;
+  highEst: string;
+  startPrice: string;
+};
+
 export function LotsAdminClient() {
   const [auctions, setAuctions] = useState<AuctionCatalogRow[]>([]);
   const [lots, setLots] = useState<LotRow[]>([]);
@@ -55,6 +67,9 @@ export function LotsAdminClient() {
   } | null>(null);
   const [importing, setImporting] = useState(false);
   const [removingAll, setRemovingAll] = useState(false);
+  const [editingLotId, setEditingLotId] = useState<string | null>(null);
+  const [editDraft, setEditDraft] = useState<LotEditDraft | null>(null);
+  const [updatingLot, setUpdatingLot] = useState(false);
   const importFileRef = useRef<HTMLInputElement>(null);
   /** "" = all auctions */
   const [exportAuctionFilter, setExportAuctionFilter] = useState("");
@@ -264,6 +279,65 @@ export function LotsAdminClient() {
       await load();
     } catch (e) {
       setErr(e instanceof Error ? e.message : "删除失败");
+    }
+  }
+
+  function startEditLot(l: LotRow) {
+    setErr("");
+    setEditingLotId(l.id);
+    setEditDraft({
+      auctionId: l.auctionId || "",
+      roundId: l.roundId || "",
+      number: l.number || "",
+      title: l.title || "",
+      estimate: l.estimate || "",
+      website: l.website || "",
+      lowEst: l.lowEst || "",
+      highEst: l.highEst || "",
+      startPrice: l.startPrice || "",
+    });
+  }
+
+  function cancelEditLot() {
+    setEditingLotId(null);
+    setEditDraft(null);
+    setUpdatingLot(false);
+  }
+
+  async function saveEditLot(id: string) {
+    if (!editDraft) return;
+    if (!editDraft.auctionId) {
+      setErr("请先为拍品选择所属场次");
+      return;
+    }
+    if (!editDraft.title.trim()) {
+      setErr("拍品标题不能为空");
+      return;
+    }
+    setErr("");
+    setUpdatingLot(true);
+    try {
+      const low = editDraft.lowEst.trim();
+      const high = editDraft.highEst.trim();
+      const single = editDraft.estimate.trim();
+      const estCombined = single || buildEstimate(low, high, "");
+      await update(ref(db, `auctions/lots/${id}`), {
+        auctionId: editDraft.auctionId,
+        roundId: editDraft.roundId || "",
+        number: editDraft.number.trim() || "—",
+        title: editDraft.title.trim(),
+        estimate: estCombined,
+        website: editDraft.website.trim() || "",
+        lowEst: low,
+        highEst: high,
+        startPrice: editDraft.startPrice.trim() || "",
+        updatedAt: Date.now(),
+      });
+      cancelEditLot();
+      await load();
+    } catch (e) {
+      setErr(e instanceof Error ? e.message : "更新失败");
+      setUpdatingLot(false);
     }
   }
 
@@ -719,28 +793,154 @@ export function LotsAdminClient() {
               <tbody>
                 {lots.map((l) => (
                   <tr key={l.id}>
-                    <td>{l.number || "—"}</td>
-                    <td>{l.title || "—"}</td>
-                    <td className="admin-cell-mono">{auctionTitle(l.auctionId)}</td>
-                    <td>{roundLabel(l.auctionId, l.roundId)}</td>
-                    <td>{displayEstimate(l) || "—"}</td>
-                    <td>{l.lowEst || "—"}</td>
-                    <td>{l.highEst || "—"}</td>
-                    <td>{l.startPrice || "—"}</td>
-                    <td className="admin-cell-mono">
-                      {l.website ? (
-                        <a href={l.website} target="_blank" rel="noopener noreferrer" className="admin-erp-site-link">
-                          链接
-                        </a>
-                      ) : (
-                        "—"
-                      )}
-                    </td>
-                    <td>
-                      <button type="button" className="admin-auction-linkbtn danger" onClick={() => onDeleteLot(l.id)}>
-                        删除
-                      </button>
-                    </td>
+                    {editingLotId === l.id && editDraft ? (
+                      <>
+                        <td>
+                          <input
+                            className="admin-auction-input"
+                            value={editDraft.number}
+                            onChange={(e) => setEditDraft({ ...editDraft, number: e.target.value })}
+                            placeholder="LOT"
+                          />
+                        </td>
+                        <td>
+                          <input
+                            className="admin-auction-input"
+                            value={editDraft.title}
+                            onChange={(e) => setEditDraft({ ...editDraft, title: e.target.value })}
+                            placeholder="标题"
+                          />
+                        </td>
+                        <td className="admin-cell-mono">
+                          <select
+                            className="admin-auction-input"
+                            value={editDraft.auctionId}
+                            onChange={(e) =>
+                              setEditDraft({
+                                ...editDraft,
+                                auctionId: e.target.value,
+                                roundId: "",
+                              })
+                            }
+                          >
+                            <option value="">选择场次…</option>
+                            {auctions.map((a) => (
+                              <option key={a.id} value={a.id}>
+                                {a.title}
+                              </option>
+                            ))}
+                          </select>
+                        </td>
+                        <td>
+                          <select
+                            className="admin-auction-input"
+                            value={editDraft.roundId}
+                            onChange={(e) => setEditDraft({ ...editDraft, roundId: e.target.value })}
+                            disabled={!editDraft.auctionId}
+                          >
+                            <option value="">暂不指定</option>
+                            {(roundsByAuction[editDraft.auctionId] || []).map((r) => (
+                              <option key={r.id} value={r.id}>
+                                {r.label}
+                              </option>
+                            ))}
+                          </select>
+                        </td>
+                        <td>
+                          <input
+                            className="admin-auction-input"
+                            value={editDraft.estimate}
+                            onChange={(e) => setEditDraft({ ...editDraft, estimate: e.target.value })}
+                            placeholder="Estimate"
+                          />
+                        </td>
+                        <td>
+                          <input
+                            className="admin-auction-input"
+                            value={editDraft.lowEst}
+                            onChange={(e) => setEditDraft({ ...editDraft, lowEst: e.target.value })}
+                            placeholder="LowEst"
+                          />
+                        </td>
+                        <td>
+                          <input
+                            className="admin-auction-input"
+                            value={editDraft.highEst}
+                            onChange={(e) => setEditDraft({ ...editDraft, highEst: e.target.value })}
+                            placeholder="HighEst"
+                          />
+                        </td>
+                        <td>
+                          <input
+                            className="admin-auction-input"
+                            value={editDraft.startPrice}
+                            onChange={(e) => setEditDraft({ ...editDraft, startPrice: e.target.value })}
+                            placeholder="StartPrice"
+                          />
+                        </td>
+                        <td className="admin-cell-mono">
+                          <input
+                            className="admin-auction-input"
+                            type="url"
+                            value={editDraft.website}
+                            onChange={(e) => setEditDraft({ ...editDraft, website: e.target.value })}
+                            placeholder="https://…"
+                          />
+                        </td>
+                        <td style={{ whiteSpace: "nowrap" }}>
+                          <button
+                            type="button"
+                            className="admin-auction-linkbtn"
+                            disabled={updatingLot}
+                            onClick={() => void saveEditLot(l.id)}
+                          >
+                            {updatingLot ? "保存中…" : "保存"}
+                          </button>
+                          <button
+                            type="button"
+                            className="admin-auction-linkbtn"
+                            disabled={updatingLot}
+                            onClick={cancelEditLot}
+                            style={{ marginLeft: 8 }}
+                          >
+                            取消
+                          </button>
+                        </td>
+                      </>
+                    ) : (
+                      <>
+                        <td>{l.number || "—"}</td>
+                        <td>{l.title || "—"}</td>
+                        <td className="admin-cell-mono">{auctionTitle(l.auctionId)}</td>
+                        <td>{roundLabel(l.auctionId, l.roundId)}</td>
+                        <td>{displayEstimate(l) || "—"}</td>
+                        <td>{l.lowEst || "—"}</td>
+                        <td>{l.highEst || "—"}</td>
+                        <td>{l.startPrice || "—"}</td>
+                        <td className="admin-cell-mono">
+                          {l.website ? (
+                            <a href={l.website} target="_blank" rel="noopener noreferrer" className="admin-erp-site-link">
+                              链接
+                            </a>
+                          ) : (
+                            "—"
+                          )}
+                        </td>
+                        <td style={{ whiteSpace: "nowrap" }}>
+                          <button type="button" className="admin-auction-linkbtn" onClick={() => startEditLot(l)}>
+                            编辑
+                          </button>
+                          <button
+                            type="button"
+                            className="admin-auction-linkbtn danger"
+                            style={{ marginLeft: 8 }}
+                            onClick={() => onDeleteLot(l.id)}
+                          >
+                            删除
+                          </button>
+                        </td>
+                      </>
+                    )}
                   </tr>
                 ))}
               </tbody>
