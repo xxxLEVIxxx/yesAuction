@@ -70,6 +70,7 @@ export function LotsAdminClient() {
   const [editingLotId, setEditingLotId] = useState<string | null>(null);
   const [editDraft, setEditDraft] = useState<LotEditDraft | null>(null);
   const [updatingLot, setUpdatingLot] = useState(false);
+  const [pendingScrollLotId, setPendingScrollLotId] = useState<string | null>(null);
   const importFileRef = useRef<HTMLInputElement>(null);
   /** "" = all auctions */
   const [exportAuctionFilter, setExportAuctionFilter] = useState("");
@@ -147,6 +148,15 @@ export function LotsAdminClient() {
       cancelled = true;
     };
   }, [load]);
+
+  useEffect(() => {
+    if (!pendingScrollLotId) return;
+    const row = document.querySelector(`[data-lot-id="${pendingScrollLotId}"]`) as HTMLElement | null;
+    if (row) {
+      row.scrollIntoView({ block: "center", inline: "nearest" });
+    }
+    setPendingScrollLotId(null);
+  }, [lots, pendingScrollLotId]);
 
   async function onAddLot(e: FormEvent) {
     e.preventDefault();
@@ -333,6 +343,7 @@ export function LotsAdminClient() {
         startPrice: editDraft.startPrice.trim() || "",
         updatedAt: Date.now(),
       });
+      setPendingScrollLotId(id);
       cancelEditLot();
       await load();
     } catch (e) {
@@ -792,7 +803,11 @@ export function LotsAdminClient() {
               </thead>
               <tbody>
                 {lots.map((l) => (
-                  <tr key={l.id}>
+                  <tr
+                    key={l.id}
+                    data-lot-id={l.id}
+                    className={editingLotId === l.id ? "admin-lot-row editing" : "admin-lot-row"}
+                  >
                     {editingLotId === l.id && editDraft ? (
                       <>
                         <td>

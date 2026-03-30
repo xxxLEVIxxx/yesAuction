@@ -1,7 +1,13 @@
 "use client";
 
 import { FormEvent, useEffect, useRef, useState } from "react";
-import { onAuthStateChanged, signInWithEmailAndPassword, createUserWithEmailAndPassword, updateProfile } from "firebase/auth";
+import {
+  onAuthStateChanged,
+  sendPasswordResetEmail,
+  signInWithEmailAndPassword,
+  createUserWithEmailAndPassword,
+  updateProfile,
+} from "firebase/auth";
 import { get, ref, runTransaction, set } from "firebase/database";
 import { auth, db } from "@/lib/firebase";
 import { loadStripe } from "@stripe/stripe-js";
@@ -25,6 +31,8 @@ export default function RegisterPage() {
   const [currentUid, setCurrentUid] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [loginErr, setLoginErr] = useState("");
+  const [resetEmailSent, setResetEmailSent] = useState(false);
+  const [resetSending, setResetSending] = useState(false);
   const [err, setErr] = useState("");
   const [successBidderNumber, setSuccessBidderNumber] = useState<number | null>(null);
 
@@ -125,6 +133,7 @@ export default function RegisterPage() {
   async function doLogin(e: FormEvent) {
     e.preventDefault();
     setLoginErr("");
+    setResetEmailSent(false);
     setSubmitting(true);
     try {
       await signInWithEmailAndPassword(auth, loginEmail.trim(), loginPw);
@@ -138,6 +147,34 @@ export default function RegisterPage() {
       setLoginErr(m[code] || "登录失败");
     } finally {
       setSubmitting(false);
+    }
+  }
+
+  async function handleForgotPassword() {
+    setLoginErr("");
+    setResetEmailSent(false);
+    const addr = loginEmail.trim();
+    if (!addr) {
+      setLoginErr("请先填写邮箱地址");
+      return;
+    }
+    setResetSending(true);
+    try {
+      const continueUrl = `${window.location.origin}/register`;
+      await sendPasswordResetEmail(auth, addr, {
+        url: continueUrl,
+        handleCodeInApp: false,
+      });
+      setResetEmailSent(true);
+    } catch (error: unknown) {
+      const code = typeof error === "object" && error && "code" in error ? String(error.code) : "auth/unknown";
+      const m: Record<string, string> = {
+        "auth/invalid-email": "邮箱格式不正确",
+        "auth/missing-email": "请填写邮箱地址",
+      };
+      setLoginErr(m[code] || "发送失败，请稍后重试");
+    } finally {
+      setResetSending(false);
     }
   }
 
@@ -282,16 +319,59 @@ export default function RegisterPage() {
             <div className="sec-title">登录账户</div>
             <div className="sec-sub">登录后即可参与竞拍</div>
             <form onSubmit={doLogin} className="stack">
-              <input className="input" type="email" placeholder="电子邮件" value={loginEmail} onChange={(e) => setLoginEmail(e.target.value)} />
+              <input
+                className="input"
+                type="email"
+                placeholder="邮箱"
+                value={loginEmail}
+                onChange={(e) => {
+                  setLoginEmail(e.target.value);
+                  setResetEmailSent(false);
+                }}
+              />
               <input className="input" type="password" placeholder="密码" value={loginPw} onChange={(e) => setLoginPw(e.target.value)} />
+              {resetEmailSent ? (
+                <div className="notice">
+                  <p style={{ margin: "0 0 10px" }}>
+                    若该邮箱已在本站注册，我们已向该邮箱发送<strong>重置密码</strong>邮件。
+                  </p>
+                  <p style={{ margin: "0 0 10px" }}>
+                    请打开邮箱，点击邮件正文中的重置链接完成操作。若链接无法点击，请长按或选中整段链接，复制到浏览器地址栏打开。
+                  </p>
+                  <p style={{ margin: 0 }}>
+                    未收到邮件请先查看<strong>垃圾邮件</strong>文件夹。如需帮助，请联系{" "}
+                    <a href="mailto:info@theyesauction.com">info@theyesauction.com</a>。
+                  </p>
+                </div>
+              ) : null}
               {loginErr ? <div className="error">{loginErr}</div> : null}
               <button className="btn" disabled={submitting}>
                 {submitting ? "登录中…" : "登录"}
               </button>
             </form>
-            <button className="btn-link" onClick={() => setMode("register")}>
-              没有账户？创建新账户
-            </button>
+            <div
+              style={{
+                display: "flex",
+                justifyContent: "space-between",
+                alignItems: "center",
+                gap: 12,
+                flexWrap: "wrap",
+                marginTop: 8,
+              }}
+            >
+              <button
+                type="button"
+                className="btn-link"
+                onClick={handleForgotPassword}
+                disabled={submitting || resetSending}
+                style={{ marginTop: 0 }}
+              >
+                {resetSending ? "发送中…" : "忘记密码？"}
+              </button>
+              <button type="button" className="btn-link" onClick={() => setMode("register")} style={{ marginTop: 0 }}>
+                没有账户？创建新账户
+              </button>
+            </div>
           </section>
         ) : (
           <section className="card" style={{ marginTop: 24 }}>

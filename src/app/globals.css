@@ -179,6 +179,15 @@ body {
   line-height: 1.7;
 }
 
+.notice a {
+  color: var(--gold);
+  font-weight: 600;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+  cursor: pointer;
+  pointer-events: auto;
+}
+
 .stack {
   display: grid;
   gap: 12px;
@@ -715,6 +724,32 @@ body {
 
 .admin-table tbody tr:hover {
   background: #fafbfc;
+}
+
+.admin-lot-row td {
+  padding-top: 8px;
+  padding-bottom: 8px;
+}
+
+.admin-lot-row.editing .admin-auction-input {
+  width: 100%;
+  box-sizing: border-box;
+  font: inherit;
+  line-height: 1.5;
+  padding: 2px 0;
+  min-height: 0;
+  height: auto;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  color: inherit;
+  overflow: visible;
+  text-overflow: clip;
+}
+
+.admin-lot-row.editing .admin-auction-linkbtn {
+  font-size: 11px;
+  padding: 2px 0;
 }
 
 .admin-cell-mono {

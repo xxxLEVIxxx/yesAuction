@@ -231,7 +231,7 @@ export function AuctionHome() {
               </p>
               <div className="auction-actions">
                 <button type="button" className="btn-outline" onClick={() => auth.signOut()}>
-                  切换账户
+                  登出
                 </button>
               </div>
             </>
