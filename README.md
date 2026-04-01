@@ -16,7 +16,27 @@ This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-
 
 **Public catalog:** `/auction/[auctionId]` lists rounds (tabs) and lots (LOT、标题、估价、起拍价) with search; linked from homepage **预出价目录** and from approved join requests (**浏览拍品 / 预出价**). Each lot links to **`/auction/[auctionId]/lot/[lotId]`** (pre-bid UI, same as `/bid` with lot context). Global pre-bidding without a lot remains at `/bid`.
 
-**预出价 (pre-bids):** written to **`itemBids/{lotId}/{userId}`**, **`absenteeBids/{lotId}/{userId}`**, and **`itemBidHistory/{lotId}/{pushId}`** (see `BidLotClient`). The bid page reads **`itemBids/.../amount`** to show “当前预出价” and allows **修改** (increase-only).
+**预出价 (pre-bids):** written to **`itemBids/{lotId}/{userId}`**, **`absenteeBids/{lotId}/{userId}`**, **`itemBidHistory/{lotId}/{pushId}`**, and **`lotPrebidHigh/{lotId}`** (aggregate max pre-bid for the lot; see `BidLotClient` + `lotPrebidHigh.ts`). The bid page reads **`itemBids/.../amount`** to show “当前预出价” and allows **修改** (increase-only).
+
+### Realtime Database rules — `PERMISSION_DENIED` when bidding
+
+If bidding fails with **permission denied**, your rules almost certainly omit **`lotPrebidHigh`**. In **Firebase Console → Realtime Database → Rules**, add a branch (merge with your existing JSON; do not replace the whole file unless you know what you are doing):
+
+```json
+"lotPrebidHigh": {
+  "$lotId": {
+    ".read": true,
+    ".write": "auth != null"
+  }
+}
+```
+
+- **`.read`:** public read is fine (everyone can see the current highest pre-bid). Restrict further if you need to.
+- **`.write`:** must allow signed-in users (`auth != null`) so `runTransaction` + sync can update the aggregate. Tighten with custom validation if you use Cloud Functions later.
+
+Publish rules after saving.
+
+To show **「当前全场最高预出价」** in the UI, the client either reads **`lotPrebidHigh/{lotId}`** or aggregates **`itemBids/{lotId}`** (all bidders). If your rules only allow each user to read `itemBids/{lotId}/{theirUid}` but **not** the parent `itemBids/{lotId}`, the list listener cannot run — rely on **`lotPrebidHigh`** reads (and writes) as above, or broaden read on `itemBids/{lotId}` for signed-in users.
 
 **LOT ↔ `lotId` export:** In **管理后台 → 拍品与场次** (`/admin/lots`), use **导出 LOT ↔ lotId** to download **JSON** or **CSV** with `lotNumber`, Firebase `lotId`, `auctionId`, and **`bidPath` / `bidUrl`** (`/auction/{auctionId}/lot/{lotId}`). Optional env **`NEXT_PUBLIC_APP_ORIGIN`** sets the domain in exported `bidUrl`. Helper: `lotBidPath` / `lotBidUrl` in `src/lib/lotBidUrls.ts`.
 

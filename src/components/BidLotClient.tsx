@@ -2,7 +2,7 @@
 
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { onAuthStateChanged, signOut, type User } from "firebase/auth";
-import { get, onValue, push, ref, update } from "firebase/database";
+import { get, onValue, push, ref, runTransaction, update } from "firebase/database";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { auth, db } from "@/lib/firebase";
@@ -10,7 +10,13 @@ import { JoinAuctionButton } from "@/components/JoinAuctionButton";
 import { parseJoinRequest, type JoinRequestRow } from "@/lib/auctionJoinRequests";
 import { buildEstimate } from "@/lib/importLotsFromSpreadsheet";
 import { buildBidPriceLadder, getBidIncrement } from "@/lib/bidIncrements";
-import { minPriceIndexFromStart } from "@/lib/lotBid";
+import { minPriceIndexFromStart, minPriceIndexStrictlyAbove } from "@/lib/lotBid";
+import {
+  LOT_PREBID_HIGH_PATH,
+  maxAmountFromItemBidsSnapshot,
+  parseLotPrebidHighSnap,
+  syncLotPrebidHighFromItemBids,
+} from "@/lib/lotPrebidHigh";
 
 type Lot = {
   id?: string;
@@ -66,6 +72,16 @@ export function BidLotClient({
   const [errMsg, setErrMsg] = useState("");
   /** Current pre-bid max from RTDB `itemBids/{lotId}/{uid}/amount` */
   const [existingBidAmount, setExistingBidAmount] = useState<number | null>(null);
+  /** Max from `lotPrebidHigh` (aggregate), live-updated. */
+  const [globalHighAmount, setGlobalHighAmount] = useState(0);
+  /** Max from all rows under `itemBids/{lotId}` (source of truth for display if aggregate lags or is blocked). */
+  const [itemBidsMaxAll, setItemBidsMaxAll] = useState(0);
+
+  /** Shown as「当前全场最高」and used for competitive floor (max of aggregate + itemBids scan). */
+  const fieldHighEffective = useMemo(
+    () => Math.max(globalHighAmount, itemBidsMaxAll),
+    [globalHighAmount, itemBidsMaxAll],
+  );
   const [bidFetchDone, setBidFetchDone] = useState(false);
   /** Show drum (true) vs summary line (false when already have a bid). */
   const [editingBid, setEditingBid] = useState(true);
@@ -95,15 +111,52 @@ export function BidLotClient({
     [prices, lot, initialMinBid],
   );
 
-  /** Drum floor: start price, or current bid when modifying (pre-bids can only go up). */
+  /** First ladder step strictly above the current max pre-bid among all bidders. */
+  const competitiveFloorIdx = useMemo(
+    () => minPriceIndexStrictlyAbove(prices, fieldHighEffective),
+    [prices, fieldHighEffective],
+  );
+
+  /** Drum floor: start price, global competitive high, and own current bid (pre-bids can only go up). */
   const drumMinIdx = useMemo(() => {
-    let m = minSelectableIdx;
+    let m = Math.max(minSelectableIdx, competitiveFloorIdx);
     if (editingBid && existingBidAmount != null && existingBidAmount > 0) {
       const i = prices.findIndex((p) => p >= existingBidAmount);
       if (i >= 0) m = Math.max(m, i);
     }
     return m;
-  }, [minSelectableIdx, prices, editingBid, existingBidAmount]);
+  }, [minSelectableIdx, competitiveFloorIdx, prices, editingBid, existingBidAmount]);
+
+  useEffect(() => {
+    if (!activeLotId) {
+      setGlobalHighAmount(0);
+      return;
+    }
+    const highRef = ref(db, `${LOT_PREBID_HIGH_PATH}/${activeLotId}`);
+    const unsub = onValue(highRef, (snap) => {
+      setGlobalHighAmount(parseLotPrebidHighSnap(snap));
+    });
+    return () => unsub();
+  }, [activeLotId]);
+
+  /** Live max across all bidders — keeps UI correct even if `lotPrebidHigh` is empty or rules block it. */
+  useEffect(() => {
+    if (!activeLotId) {
+      setItemBidsMaxAll(0);
+      return;
+    }
+    const bidsRef = ref(db, `itemBids/${activeLotId}`);
+    const unsub = onValue(bidsRef, (snap) => {
+      setItemBidsMaxAll(maxAmountFromItemBidsSnapshot(snap));
+    });
+    return () => unsub();
+  }, [activeLotId]);
+
+  /** Repair aggregate from `itemBids` if `lotPrebidHigh` was missing (legacy data). */
+  useEffect(() => {
+    if (!activeLotId) return;
+    syncLotPrebidHighFromItemBids(db, activeLotId).catch(() => {});
+  }, [activeLotId]);
 
   useEffect(() => {
     setSelectedIdx((prev) => Math.max(drumMinIdx, prev));
@@ -346,10 +399,29 @@ export function BidLotClient({
     const targetLotId = activeLotId || resolvedLotId || "general";
 
     try {
+      await syncLotPrebidHighFromItemBids(db, targetLotId);
+
       const existingAmountSnap = await get(ref(db, `itemBids/${targetLotId}/${currentUser.uid}/amount`));
       const existingAmount = existingAmountSnap.exists() ? Number(existingAmountSnap.val()) : 0;
       if (existingAmount > 0 && amount < existingAmount) {
         throw new Error("每件拍品的预出价只能提高，不能降低");
+      }
+
+      const highRef = ref(db, `${LOT_PREBID_HIGH_PATH}/${targetLotId}`);
+      const txResult = await runTransaction(highRef, (current) => {
+        let safeH = 0;
+        if (current != null && typeof current === "object" && "amount" in current) {
+          const n = Number((current as { amount: unknown }).amount);
+          if (Number.isFinite(n) && n > 0) safeH = n;
+        }
+        if (!Number.isFinite(amount)) return undefined;
+        if (amount < existingAmount) return undefined;
+        if (amount <= safeH) return undefined;
+        return { amount, updatedAt: Date.now() };
+      });
+
+      if (!txResult.committed) {
+        throw new Error("出价须高于当前全场最高预出价，请稍等同步后重试");
       }
 
       const now = Date.now();
@@ -375,9 +447,17 @@ export function BidLotClient({
 
       setExistingBidAmount(amount);
       setEditingBid(false);
-    } catch (e) {
-      const msg = e instanceof Error ? e.message : "提交失败，请重试";
-      setErrMsg(msg);
+    } catch (e: unknown) {
+      const code =
+        typeof e === "object" && e !== null && "code" in e ? String((e as { code: unknown }).code) : "";
+      if (code === "PERMISSION_DENIED" || code === "permission_denied") {
+        setErrMsg(
+          "无权限写入数据库。请在 Firebase 控制台 → Realtime Database → Rules 中为 lotPrebidHigh 添加读写规则（见项目 README「PERMISSION_DENIED」一节）。",
+        );
+      } else {
+        const msg = e instanceof Error ? e.message : "提交失败，请重试";
+        setErrMsg(msg);
+      }
     } finally {
       setSubmitting(false);
     }
@@ -587,6 +667,10 @@ export function BidLotClient({
                 <p className="bid-current-line">
                   您当前的预出价为 <strong className="bid-current-amt">{fmt(existingBidAmount)}</strong>
                 </p>
+                <p className="sec-sub" style={{ marginBottom: 10 }}>
+                  当前全场最高预出价：{" "}
+                  <strong className="gold">{fieldHighEffective > 0 ? fmt(fieldHighEffective) : "—"}</strong>
+                </p>
                 <p className="sec-sub" style={{ marginBottom: 14 }}>
                   如需提高上限，请点击修改（不可降低）。
                 </p>
@@ -601,6 +685,19 @@ export function BidLotClient({
                 <div className="sec-sub" style={{ marginBottom: 8 }}>
                   {existingBidAmount != null ? "调整您的预出价上限" : "设定您的预出价上限"}
                 </div>
+                <p className="sec-sub" style={{ marginBottom: 8 }}>
+                  当前全场最高预出价：{" "}
+                  <strong className="gold">{fieldHighEffective > 0 ? fmt(fieldHighEffective) : "—"}</strong>
+                  {fieldHighEffective > 0 ? (
+                    <span style={{ display: "block", marginTop: 6, fontSize: 12, color: "var(--muted)" }}>
+                      提高出价时须高于此金额（含您本人已出的价；数据实时更新）。
+                    </span>
+                  ) : (
+                    <span style={{ display: "block", marginTop: 6, fontSize: 12, color: "var(--muted)" }}>
+                      尚无竞买人预出价时，您只需满足起拍价与加价档。
+                    </span>
+                  )}
+                </p>
                 <button type="button" className="btn-link" style={{ marginTop: 0, marginBottom: 8 }} onClick={() => setHowOpen(true)}>
                   如何进行预出价 →
                 </button>

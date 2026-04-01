@@ -22,3 +22,15 @@ export function minPriceIndexFromStart(
   const i = prices.findIndex((p) => p >= n);
   return i >= 0 ? i : 0;
 }
+
+/**
+ * Smallest ladder index whose price is strictly greater than `aboveValue` (competitive floor).
+ * If `aboveValue` is 0 or invalid, returns 0. If no rung is above, returns last index.
+ */
+export function minPriceIndexStrictlyAbove(prices: number[], aboveValue: number): number {
+  if (prices.length === 0) return 0;
+  if (!Number.isFinite(aboveValue) || aboveValue <= 0) return 0;
+  const i = prices.findIndex((p) => p > aboveValue);
+  if (i >= 0) return i;
+  return prices.length - 1;
+}
