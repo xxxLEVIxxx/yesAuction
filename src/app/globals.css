@@ -466,6 +466,57 @@ body {
   margin: 0 auto;
 }
 
+.bid-lot-website-block {
+  margin-top: 22px;
+  padding-top: 20px;
+  border-top: 1px solid var(--border);
+  text-align: left;
+  max-width: 100%;
+}
+
+.bid-current-card .bid-lot-website-block {
+  margin-left: auto;
+  margin-right: auto;
+}
+
+.bid-lot-website-label {
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--muted);
+  margin-bottom: 8px;
+}
+
+.bid-lot-website-desc {
+  font-size: 13px;
+  color: var(--text);
+  line-height: 1.6;
+  margin: 0 0 18px;
+}
+
+.bid-lot-website-link {
+  display: inline-block;
+  font-size: 12px;
+  color: var(--gold);
+  font-weight: 600;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+  word-break: break-all;
+  line-height: 1.45;
+}
+
+.bid-lot-website-link:hover {
+  color: var(--text);
+}
+
+.bid-lot-website-missing {
+  font-size: 12px;
+  color: var(--muted);
+  margin: 0;
+  font-style: italic;
+}
+
 .bid-edit-actions {
   display: flex;
   flex-direction: column;
@@ -1890,4 +1941,110 @@ body {
   .auction-hero-title {
     font-size: 24px;
   }
+}
+
+/* ---- Public /links (link hub, no auth) ---- */
+.links-hub {
+  padding-top: 28px;
+  padding-bottom: 80px;
+}
+
+.links-hub-intro {
+  text-align: center;
+  margin-bottom: 28px;
+}
+
+.links-hub-title {
+  font-family: "Cormorant Garamond", serif;
+  font-size: 26px;
+  font-weight: 500;
+  letter-spacing: 0.08em;
+  color: var(--text);
+  margin: 0 0 12px;
+}
+
+.links-hub-sub {
+  margin: 0 auto;
+  max-width: 340px;
+  line-height: 1.65;
+}
+
+.links-hub-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.links-hub-item {
+  margin: 0;
+}
+
+.links-hub-btn {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  width: 100%;
+  padding: 18px 20px;
+  border-radius: 4px;
+  border: 1px solid var(--border);
+  background: var(--dark2);
+  color: var(--text);
+  font-family: "Lato", sans-serif;
+  font-size: 15px;
+  font-weight: 600;
+  text-decoration: none;
+  text-align: left;
+  box-shadow: 0 2px 12px rgba(47, 37, 22, 0.06);
+  transition:
+    border-color 0.15s,
+    background 0.15s,
+    box-shadow 0.15s;
+}
+
+a.links-hub-btn:hover {
+  border-color: var(--gold);
+  background: var(--dark3);
+  box-shadow: 0 4px 18px rgba(201, 168, 76, 0.12);
+}
+
+.links-hub-btn-label {
+  flex: 1;
+  min-width: 0;
+}
+
+.links-hub-btn-arrow {
+  flex-shrink: 0;
+  font-size: 18px;
+  color: var(--gold);
+  line-height: 1;
+}
+
+.links-hub-btn--pending {
+  cursor: default;
+  opacity: 0.92;
+  border-style: dashed;
+  flex-wrap: wrap;
+}
+
+.links-hub-btn-pending {
+  font-size: 11px;
+  font-weight: 400;
+  letter-spacing: 0.06em;
+  color: var(--muted);
+  width: 100%;
+  margin-top: 6px;
+  padding-left: 0;
+}
+
+.links-hub-footnote {
+  margin-top: 32px;
+  text-align: center;
+  line-height: 1.6;
+  max-width: 360px;
+  margin-left: auto;
+  margin-right: auto;
 }

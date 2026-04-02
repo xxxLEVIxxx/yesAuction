@@ -28,7 +28,16 @@ type Lot = {
   lowEst?: string;
   highEst?: string;
   startPrice?: string;
+  /** 官网拍品页链接（后台 / 导入 website 列） */
+  website?: string;
 };
+
+function externalWebsiteHref(url: string): string {
+  const t = url.trim();
+  if (!t) return "#";
+  if (/^https?:\/\//i.test(t)) return t;
+  return `https://${t}`;
+}
 
 function displayEstimate(l: Lot): string {
   const e = l.estimate?.trim();
@@ -803,6 +812,28 @@ export function BidLotClient({
                 <button type="button" className="btn-outline bid-modify-btn" onClick={openModifyBid}>
                   修改预出价
                 </button>
+                {lot ? (
+                  <div className="bid-lot-website-block">
+                    <div className="bid-lot-website-label">官网描述</div>
+                    <p className="bid-lot-website-desc">
+                      {lot.title?.trim() ? lot.title : "本拍品暂无文字说明，请以现场与图录为准。"}
+                    </p>
+                    <div className="bid-lot-website-label">官网链接</div>
+                    {lot.website?.trim() ? (
+                      <a
+                        href={externalWebsiteHref(lot.website)}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="bid-lot-website-link"
+                        title={lot.website.trim()}
+                      >
+                        {lot.website.trim()}
+                      </a>
+                    ) : (
+                      <p className="bid-lot-website-missing">暂无官网链接</p>
+                    )}
+                  </div>
+                ) : null}
               </section>
             ) : null}
 
