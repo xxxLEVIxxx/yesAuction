@@ -17,14 +17,45 @@ export function parseLotPrebidHighSnap(snap: DataSnapshot): number {
 
 /** Max of all bidder `amount` fields under `itemBids/{lotId}` (live snapshot). */
 export function maxAmountFromItemBidsSnapshot(snap: DataSnapshot): number {
-  if (!snap.exists()) return 0;
-  let maxB = 0;
+  return leadingBidFromItemBidsSnapshot(snap).amount;
+}
+
+export type LeadingBidInfo = {
+  amount: number;
+  bidderNumber: number | null;
+  userId: string | null;
+};
+
+function leadingBidIsBetter(cand: LeadingBidInfo, current: LeadingBidInfo): boolean {
+  if (cand.amount !== current.amount) return cand.amount > current.amount;
+  const cb = cand.bidderNumber ?? 0;
+  const ib = current.bidderNumber ?? 0;
+  if (cb !== ib) return cb > ib;
+  if (!cand.userId || !current.userId) return false;
+  return cand.userId.localeCompare(current.userId) < 0;
+}
+
+/**
+ * Highest `amount` among children of `itemBids/{lotId}` and the winning row’s bidder number.
+ * Ties: higher `bidderNumber` wins; then lexicographic `userId` for stability.
+ */
+export function leadingBidFromItemBidsSnapshot(snap: DataSnapshot): LeadingBidInfo {
+  if (!snap.exists()) {
+    return { amount: 0, bidderNumber: null, userId: null };
+  }
+  let best: LeadingBidInfo = { amount: 0, bidderNumber: null, userId: null };
   snap.forEach((child) => {
-    const raw = child.val() as { amount?: unknown } | null;
-    const a = raw && raw.amount != null ? Number(raw.amount) : NaN;
-    if (Number.isFinite(a) && a > maxB) maxB = a;
+    const uid = child.key;
+    const raw = child.val() as { amount?: unknown; bidderNumber?: unknown } | null;
+    if (!raw || !uid) return;
+    const a = raw.amount != null ? Number(raw.amount) : NaN;
+    if (!Number.isFinite(a) || a <= 0) return;
+    const bnRaw = raw.bidderNumber != null ? Number(raw.bidderNumber) : NaN;
+    const bidderNum = Number.isFinite(bnRaw) && bnRaw > 0 ? Math.floor(bnRaw) : null;
+    const cand: LeadingBidInfo = { amount: a, bidderNumber: bidderNum, userId: uid };
+    if (leadingBidIsBetter(cand, best)) best = cand;
   });
-  return maxB;
+  return best;
 }
 
 /** Max of all bidder amounts under itemBids for this lot. */

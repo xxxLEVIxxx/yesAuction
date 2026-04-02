@@ -308,6 +308,135 @@ body {
   overscroll-behavior-y: contain;
 }
 
+.bid-lot-nav-shell {
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+  gap: 0;
+  width: 100%;
+  max-width: 560px;
+  margin: 0 auto;
+  padding: 0 4px;
+  box-sizing: border-box;
+}
+
+.bid-lot-nav-shell--single .bid-lot-nav-side {
+  display: none;
+}
+
+.bid-lot-nav-center {
+  flex: 1;
+  min-width: 0;
+}
+
+.bid-lot-nav-side {
+  flex: 0 0 52px;
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+  padding-top: 10px;
+}
+
+.bid-lot-nav-btn {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: flex-start;
+  gap: 4px;
+  min-width: 48px;
+  min-height: 72px;
+  padding: 10px 6px;
+  border-radius: 4px;
+  border: 1px solid var(--border);
+  background: var(--dark2);
+  color: var(--gold);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-decoration: none;
+  text-align: center;
+  line-height: 1.25;
+  transition: background 0.15s, border-color 0.15s;
+}
+
+.bid-lot-nav-btn:hover:not(.bid-lot-nav-btn--disabled) {
+  background: var(--dark3);
+  border-color: var(--gold);
+  color: var(--text);
+}
+
+.bid-lot-nav-btn--next {
+  flex-direction: column-reverse;
+}
+
+.bid-lot-nav-btn--disabled {
+  opacity: 0.35;
+  cursor: not-allowed;
+  pointer-events: none;
+  color: var(--muted);
+}
+
+.bid-lot-nav-arrow {
+  font-size: 22px;
+  font-weight: 400;
+  line-height: 1;
+  color: var(--gold);
+}
+
+.bid-lot-nav-text {
+  font-size: 10px;
+  color: var(--muted);
+  max-width: 48px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.bid-leading-card {
+  margin: 18px 0 20px;
+  padding: 22px 18px 24px;
+  text-align: center;
+  background: linear-gradient(165deg, rgba(201, 168, 76, 0.12) 0%, var(--dark2) 45%);
+  border: 2px solid var(--gold);
+  border-radius: 6px;
+  box-shadow: 0 8px 28px rgba(47, 37, 22, 0.08);
+}
+
+.bid-leading-label {
+  font-family: "Cormorant Garamond", serif;
+  font-size: 15px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--muted);
+  margin-bottom: 12px;
+}
+
+.bid-leading-amount {
+  font-family: "Cormorant Garamond", serif;
+  font-size: 38px;
+  font-weight: 600;
+  color: var(--gold);
+  line-height: 1.15;
+  margin-bottom: 12px;
+}
+
+.bid-leading-bn {
+  font-size: 14px;
+  color: var(--text);
+  line-height: 1.5;
+}
+
+.bid-leading-bn strong {
+  color: var(--gold);
+  font-size: 16px;
+}
+
+.bid-leading-empty {
+  font-size: 17px;
+  color: var(--muted);
+  font-family: "Cormorant Garamond", serif;
+}
+
 .bid-current-card {
   text-align: center;
   padding: 20px 16px 22px;
