@@ -15,8 +15,9 @@ import {
 } from "@/lib/auctionCatalog";
 
 const MAIN_AUCTION_SITE = process.env.NEXT_PUBLIC_MAIN_SITE_URL?.trim() || "https://theyesauction.com";
+import { AuctionRoundsBlock } from "@/components/AuctionRoundsBlock";
 import type { AuctionRoundRow } from "@/lib/auctionRounds";
-import { formatRoundTimeRange, parseRoundsTree } from "@/lib/auctionRounds";
+import { parseRoundsTree } from "@/lib/auctionRounds";
 
 type Props = {
   user: User | null;
@@ -143,22 +144,5 @@ export function AuctionCatalogSection({ user, authLoading }: Props) {
         </div>
       ) : null}
     </section>
-  );
-}
-
-function AuctionRoundsBlock({ rounds }: { rounds: AuctionRoundRow[] | undefined }) {
-  if (!rounds?.length) return null;
-  return (
-    <ul className="auction-catalog-rounds">
-      {rounds.map((r) => (
-        <li key={r.id} className="auction-catalog-round">
-          <div className="auction-catalog-round-line">
-            <span className="auction-catalog-round-label">{r.label}</span>
-            <span className="auction-catalog-round-time">{formatRoundTimeRange(r)}</span>
-          </div>
-          {r.description ? <p className="auction-catalog-round-desc">{r.description}</p> : null}
-        </li>
-      ))}
-    </ul>
   );
 }

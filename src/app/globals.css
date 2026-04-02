@@ -1951,7 +1951,34 @@ body {
 
 .links-hub-intro {
   text-align: center;
-  margin-bottom: 28px;
+  margin-bottom: 20px;
+}
+
+.links-hub-hero {
+  margin: 12px 0 8px;
+}
+
+.links-hub-hero-title {
+  font-size: 30px;
+}
+
+.links-hub-catalog {
+  margin-bottom: 32px;
+}
+
+.links-hub-platforms-title {
+  font-family: "Cormorant Garamond", serif;
+  font-size: 22px;
+  font-weight: 500;
+  letter-spacing: 0.08em;
+  color: var(--text);
+  margin: 28px 0 8px;
+  text-align: center;
+}
+
+.links-hub-sub--tight {
+  margin-bottom: 18px;
+  text-align: center;
 }
 
 .links-hub-title {
@@ -2011,9 +2038,26 @@ a.links-hub-btn:hover {
   box-shadow: 0 4px 18px rgba(201, 168, 76, 0.12);
 }
 
-.links-hub-btn-label {
+.links-hub-btn-text-wrap {
   flex: 1;
   min-width: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 4px;
+}
+
+.links-hub-btn-label {
+  font-size: 15px;
+  font-weight: 600;
+  line-height: 1.3;
+}
+
+.links-hub-btn-sublabel {
+  font-size: 11px;
+  font-weight: 500;
+  letter-spacing: 0.06em;
+  color: var(--muted);
 }
 
 .links-hub-btn-arrow {
@@ -2027,7 +2071,8 @@ a.links-hub-btn:hover {
   cursor: default;
   opacity: 0.92;
   border-style: dashed;
-  flex-wrap: wrap;
+  flex-direction: column;
+  align-items: flex-start;
 }
 
 .links-hub-btn-pending {
@@ -2036,7 +2081,7 @@ a.links-hub-btn:hover {
   letter-spacing: 0.06em;
   color: var(--muted);
   width: 100%;
-  margin-top: 6px;
+  margin-top: 10px;
   padding-left: 0;
 }
 
