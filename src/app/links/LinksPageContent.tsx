@@ -1,6 +1,5 @@
 "use client";
 
-import Link from "next/link";
 import { useEffect, useState } from "react";
 import { get, ref } from "firebase/database";
 import { AuctionRoundsBlock } from "@/components/AuctionRoundsBlock";
@@ -75,9 +74,7 @@ export function LinksPageContent() {
   return (
     <>
       <header className="header">
-        <Link href="/" className="back-link">
-          ← 拍卖首页
-        </Link>
+        <div className="header-spacer" aria-hidden />
         <div className="logo">
           YES <em>AUCTION</em>
         </div>
